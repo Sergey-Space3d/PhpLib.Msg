@@ -1,7 +1,6 @@
 <?php
-
-require_once dirname(__FILE__).'/../class/msg/extra/message_template.php';
-require_once dirname(__FILE__).'/../class/msg/extra/message_template_man.php';
+// Copyright 2005-2022 Sergey Shustov.
+// License: GPL v2.  See License.txt.
 
 /** Edit Message Template Controller */
 class EditMessageTemplateController extends CController
