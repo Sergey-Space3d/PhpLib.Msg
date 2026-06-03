@@ -13,6 +13,7 @@ $__dir = dirname(__FILE__);
 // Setup JIT class autoload
 $__sudir = $__dir.'/extra';
 $__classes = array(
+    'EmailServer'=>$__dir.'/email_server.php',
     'EmailMan'=>$__dir.'/email_man.php',
     'Email'=>$__dir.'/email.php',
     'iSmsEngine'=>$__dir.'/isms_engine.php',

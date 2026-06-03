@@ -1,0 +1,355 @@
+<?php
+// Copyright 2005-2022 Sergey Shustov.
+// License: GPL v2.  See License.txt.
+
+class EmailServer
+{
+    protected $m_server;
+    protected $m_port;
+    protected $m_user;
+    protected $m_password;
+    protected $m_imap_stream = null;
+    
+    /////////////////////////////////////////////////////////////////////////
+    public function __construct($server, $port, $user, $password)
+    {
+        $this->m_server = $server;
+        $this->m_port = $port;
+        $this->m_user = $user;
+        $this->m_password = $password;
+    }
+    
+    /////////////////////////////////////////////////////////////////////////
+    public function open()
+    {
+        if ($this->m_imap_stream)
+            $this->close();
+            
+            $authhost = "{".$this->m_server.":".$this->m_port."/pop3/notls}INBOX";
+            $this->m_imap_stream = @imap_open($authhost, $this->m_user, $this->m_password);
+            return $this->m_imap_stream != null;
+    }
+    
+    /////////////////////////////////////////////////////////////////////////
+    public function close($expunge = false)
+    {
+        if ($this->m_imap_stream)
+        {
+            @imap_close($this->m_imap_stream, $expunge ? CL_EXPUNGE : 0);
+            $this->m_imap_stream = null;
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /////////////////////////////////////////////////////////////////////////
+    public function read($filter = 'ALL', $max_len = 0)
+    {
+        $emails = array(); // return
+        
+        if ($this->m_imap_stream)
+        {
+            $msg_ids = @imap_search($this->m_imap_stream, $filter);
+            
+            if ($msg_ids)
+            {
+                foreach ($msg_ids as $msg_id)
+                {
+                    $msg = @imap_headerinfo($this->m_imap_stream , $msg_id);
+                    
+                    if ($msg)
+                    {
+                        $struct = @imap_fetchstructure($this->m_imap_stream, $msg_id);
+                        
+                        if ($struct)
+                        {
+                            $body = null;
+                            
+                            switch ($struct->type)
+                            {
+                                case 0: // text
+                                    $body = @imap_body($this->m_imap_stream, $msg_id);
+                                    break;
+                                case 1: // multipart
+                                    $body = @imap_fetchbody($this->m_imap_stream, $msg_id, '1');
+                                    break;
+                                    
+                                case 2: // message
+                                case 3: // application
+                                case 4: // audio
+                                case 5: // image
+                                case 6: // video
+                                case 7: // other
+                                default:
+                                    break;
+                            }
+                            
+                            if ($body)
+                            {
+                                $email = new Email;
+                                
+                                // TODO: hard-coded for now
+                                $to_charset = 'UTF-8';
+                                $from_charset = null;
+                                
+                                // Remember to mailbox sequence number
+                                $uid = @imap_uid($this->m_imap_stream, $msg_id);
+                                $email->set_message_number($uid);
+                                
+                                // Set TO info
+                                $to = is_array($msg->to) ? array_shift($msg->to) : $msg->to;
+                                //$to_address = $to->mailbox . "@" . $to->host;
+                                $to_name = $to->personal;
+                                $email->set_to($this->m_user); // use real mailbox name
+                                $email->set_to_name($to_name);
+                                
+                                // Set FROM info
+                                $from = is_array($msg->from) ? array_shift($msg->from) : $msg->from;
+                                $from_address = $from->mailbox . "@" . $from->host;
+                                $from_name = $from->personal;
+                                $email->set_from($from_address);
+                                
+                                // Detect encoding
+                                $from_charset = self::charset_from_string(@imap_fetchheader($this->m_imap_stream, $msg_id));
+                                if (!$from_charset) $from_charset = self::charset_from_string($from_name);
+                                if (!$from_charset) $from_charset = self::charset_from_string($msg->subject);
+                                
+                                $from_name = self::mime_header_decode($from_name, $to_charset, $from_charset);
+                                $email->set_from_name($from_name);
+                                
+                                // Set CC info
+                                if (is_array($msg->cc))
+                                {
+                                    $cc = array_shift($msg->cc);
+                                    $cc_address = $cc->mailbox . "@" . $cc->host;
+                                    $cc_name = $cc->personal;
+                                    $email->set_cc($cc_address);
+                                    
+                                    $cc_name = self::mime_header_decode($cc_name, $to_charset, $from_charset);
+                                    $email->set_cc_name($cc_name);
+                                }
+                                
+                                // Decode subject line
+                                $title = self::mime_header_decode($msg->subject, $to_charset, $from_charset);
+                                $email->set_title($title);
+                                
+                                // Decode message's body
+                                switch ($struct->encoding)
+                                {
+                                    case 0: // 7 BIT
+                                    case 1: // 8BIT
+                                        $body = quoted_printable_decode($body);
+                                        
+                                        switch ($from_charset)
+                                        {
+                                            case 'UTF-8':
+                                                //break;
+                                            case 'KOI8-R':
+                                            case 'KOI8-U':
+                                            case 'windows-1251':
+                                            default:
+                                                if (strlen($body) > 100 && !strstr(trim($body), ' '))
+                                                {
+                                                    $body = base64_decode($body);
+                                                    
+                                                    if (!$from_charset)
+                                                        $from_charset = 'KOI8-R';
+                                                }
+                                                break;
+                                        }
+                                        break;
+                                    case 2: // BINARY
+                                        $body = imap_binary($body);
+                                        if (strlen($body) > 100 && !strstr(trim($body), ' '))
+                                            $body = base64_decode($body);
+                                            $body = quoted_printable_decode($body);
+                                            break;
+                                    case 3: // BASE64
+                                        $body = base64_decode($body);
+                                        $body = quoted_printable_decode($body);
+                                        break;
+                                    case 4: // QUOTED-PRINTABLE
+                                    case 5: // OTHER
+                                    default:
+                                        $body = quoted_printable_decode($body);
+                                        break;
+                                }
+                                
+                                $language = 'EN';
+                                
+                                switch ($from_charset)
+                                {
+                                    case 'windows-1251':
+                                    case 'KOI8-R':
+                                    case 'KOI8-U':
+                                    case 'UTF-8':
+                                        $language = 'RU';
+                                        break;
+                                    default:
+                                        break;
+                                }
+                                
+                                // Decode from mime
+                                $body = self::convert_charset($body, $to_charset, $from_charset);
+                                
+                                /*
+                                 if ($struct->encoding == 0 && (!$from_charset || $from_charset == 'windows-1251') && strlen($body) > 100 && !strstr(trim($body), ' '))
+                                 {
+                                 // It looks like the message is encoded in envelope
+                                 $body = imap_base64($body);
+                                 $body = convert_cyr_string ($body, 'k', 'w');
+                                 $language = 'RU';
+                                 }
+                                 */
+                                //$body = 'enc num: '.$struct->encoding.' enc det: '.$from_charset.'-->'.$body;
+                                
+                                // Set the suggested language
+                                $email->set_language($language);
+                                
+                                // Strip body tags, optionally limit to max. length chars
+                                $body = strip_tags($body);
+                                
+                                // Remove extra newlines
+                                $n = 1;
+                                while ($n > 0)
+                                    $body = str_replace("\r\n\r\n\r\n", "\r\n\r\n", $body, $n);
+                                    
+                                    //$body = htmlspecialchars($body, ENT_NOQUOTES);
+                                    if ($max_len > 0) $body = substr($body, 0, $max_len);
+                                    $email->set_message($body);
+                                    
+                                    // Set the timestamp
+                                    $email->set_ts($msg->udate);
+                                    
+                                    // Add to array
+                                    $emails[] = $email;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return count($emails) ? $emails : null;
+    }
+    
+    /////////////////////////////////////////////////////////////////////////
+    public function delete($msg_id, $is_uid = true)
+    {
+        if ($this->m_imap_stream)
+            return @imap_delete($this->m_imap_stream , $msg_id, $is_uid ? FT_UID : 0);
+            
+            return false;
+    }
+    
+    /////////////////////////////////////////////////////////////////////////
+    static protected function mime_header_decode($str, $to_charset, $from_charset)
+    {
+        $elements = imap_mime_header_decode($str);
+        $str = null;
+        
+        foreach ($elements as $element)
+            $str .= $element->text;
+            
+            if ($to_charset && $from_charset)
+                return self::convert_charset($str, $to_charset, $from_charset);
+                
+                return $str;
+    }
+    
+    /////////////////////////////////////////////////////////////////////////
+    static protected function convert_charset($str, $to_charset, $from_charset)
+    {
+        $to_charset = strtolower($to_charset);
+        $from_charset = strtolower($from_charset);
+        $to_charset_cyr = null;
+        $from_charset_cyr = null;
+        
+        switch ($to_charset)
+        {
+            case 'koi8-r': $to_charset_cyr = 'k'; break;
+            case 'koi8-u': $to_charset_cyr = 'k'; break;
+            case 'windows-1251': $to_charset_cyr = 'w'; break;
+            case 'iso8859-5': $to_charset_cyr = 'i'; break;
+            case 'x-cp866': $to_charset_cyr = 'a'; break;
+            case 'x-mac-cyrillic': $to_charset_cyr = 'm'; break;
+        }
+        
+        switch ($from_charset)
+        {
+            case 'koi8-r': $from_charset_cyr = 'k'; break;
+            case 'koi8-u': $from_charset_cyr = 'k'; break;
+            case 'windows-1251': $from_charset_cyr = 'w'; break;
+            case 'iso8859-5': $from_charset_cyr = 'i'; break;
+            case 'x-cp866': $from_charset_cyr = 'a'; break;
+            case 'x-mac-cyrillic': $from_charset_cyr = 'm'; break;
+        }
+        
+        if ($to_charset_cyr && $from_charset_cyr && $to_charset_cyr != $from_charset_cyr)
+            return convert_cyr_string($str, $from_charset_cyr, $to_charset_cyr);
+            else if ($to_charset == 'windows-1251' && $from_charset == 'utf-8')
+                return self::utf8_to_win($str);
+                
+                return $str;
+    }
+    
+    /////////////////////////////////////////////////////////////////////////
+    static protected function charset_from_string($str)
+    {
+        if (stristr($str, 'KOI8-R')) return 'KOI8-R';
+        if (stristr($str, 'KOI8-U')) return 'KOI8-U';
+        if (stristr($str, 'UTF-8')) return 'UTF-8';
+        if (stristr($str, 'UTF-7')) return 'UTF-7';
+        if (stristr($str, 'windows-1251')) return 'windows-1251';
+        
+        return null;
+    }
+    
+    /////////////////////////////////////////////////////////////////////////
+    static protected function utf8_to_win($fcontents)
+    {
+        $out = $c1 = '';
+        $byte2 = false;
+        for ($c = 0;$c < strlen($fcontents);$c++) {
+            $i = ord($fcontents[$c]);
+            if ($i <= 127) {
+                $out .= $fcontents[$c];
+            }
+            if ($byte2) {
+                $new_c2 = ($c1 & 3) * 64 + ($i & 63);
+                $new_c1 = ($c1 >> 2) & 5;
+                $new_i = $new_c1 * 256 + $new_c2;
+                if ($new_i == 1025) {
+                    $out_i = 168;
+                } else {
+                    if ($new_i == 1105) {
+                        $out_i = 184;
+                    } else {
+                        $out_i = $new_i - 848;
+                    }
+                }
+                // UKRAINIAN fix
+                switch ($out_i){
+                    case 262: $out_i=179;break;// пїЅ
+                    case 182: $out_i=178;break;// пїЅ
+                    case 260: $out_i=186;break;// пїЅ
+                    case 180: $out_i=170;break;// пїЅ
+                    case 263: $out_i=191;break;// пїЅ
+                    case 183: $out_i=175;break;// пїЅ
+                    case 321: $out_i=180;break;// пїЅ
+                    case 320: $out_i=165;break;// пїЅ
+                }
+                $out .= chr($out_i);
+                
+                $byte2 = false;
+            }
+            if ( ( $i >> 5) == 6) {
+                $c1 = $i;
+                $byte2 = true;
+            }
+        }
+        return $out;
+    }
+}
+?>
