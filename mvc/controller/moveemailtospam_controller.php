@@ -18,19 +18,21 @@ class MoveEmailToSpamController extends CController
         $folder = $this->get_value('folder');
         $si = unserialize($this->get_value('server_info'));
         
-        $mail_server = new EmailServer($si['server'], $si['port'], $si['service'], $si['mailbox'], $si['password']);
+        $mail_server = new EmailServer($si['server'], $si['mailbox'], $si['password']);
         
         if ($mail_server->open())
         {
             if ($mail_server->move($msg_uid, $folder))
             {
-                $mail_server->close(true);
+                $mail_server->close();
                 CHtmlPage::set_last_info("Email {$msg_uid} was moved to {$folder} Folder");
                 return true;
             }
+            
+            $mail_server->close();
         }
         
-        $errors = implode('<br/>', $mail_server->pop_errors());
+        $errors = implode('<br/>', EmailServer::pop_errors());
         CHtmlPage::set_last_error("Failed to move email {$msg_uid} to {$folder} Folder<br/>{$errors}");
         return false;  
     }

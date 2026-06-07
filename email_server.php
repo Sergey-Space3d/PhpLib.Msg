@@ -4,45 +4,44 @@
 
 class EmailServer
 {
-    protected $m_server;
-    protected $m_port;
-    protected $m_service;
-    protected $m_user;
-    protected $m_password;
+    protected $m_port = 993; // 110 for POP3
+    protected $m_service = '/imap/ssl'; // '/pop3/notls' for POP3
+    protected $m_server = null;
+    protected $m_user = null;
+    protected $m_password = null;
     protected $m_imap_stream = null;
     
-    /////////////////////////////////////////////////////////////////////////
-    public function __construct($server, $port, $service, $user, $password)
+    /** The constructor */
+    public function __construct($server, $user, $password)
     {
         $this->m_server = $server;
-        $this->m_port = $port;
-        $this->m_service = $service;
         $this->m_user = $user;
         $this->m_password = $password;
     }
     
-    public function pop_errors()
+    /** Pop the last errors from the queue */
+    static public function pop_errors()
     {
         return @imap_errors();
     }
     
-    /////////////////////////////////////////////////////////////////////////
-    public function open($flags = 0)
+    /** Open IMAP stream. Returns true on success */
+    public function open()
     {
         if ($this->m_imap_stream) $this->close();
         
         $authhost = "{".$this->m_server.":".$this->m_port.$this->m_service."}INBOX";
-        $this->m_imap_stream = @imap_open($authhost, $this->m_user, $this->m_password, $flags);
+        $this->m_imap_stream = @imap_open($authhost, $this->m_user, $this->m_password);
         
         return $this->m_imap_stream != null;
     }
     
-    /////////////////////////////////////////////////////////////////////////
-    public function close($expunge = false)
+    /** Close IMAP stream. Returns true on success */
+    public function close()
     {
         if ($this->m_imap_stream)
         {
-            @imap_close($this->m_imap_stream, $expunge ? CL_EXPUNGE : 0);
+            @imap_close($this->m_imap_stream, CL_EXPUNGE);
             $this->m_imap_stream = null;
             return true;
         }
@@ -50,24 +49,55 @@ class EmailServer
         return false;
     }
     
-    /////////////////////////////////////////////////////////////////////////
+    /** Delete email by UID. Returns true on success */
+    public function delete($msg_uid)
+    {
+        if ($this->m_imap_stream)
+        {
+            return @imap_delete($this->m_imap_stream, $msg_uid, FT_UID);
+        }
+        
+        return false;
+    }
+    
+    /** Move email to the folder. Returns true on success */
+    public function move($msg_uid, $folder)
+    {
+        if ($this->m_imap_stream)
+        {
+            if (@imap_mail_move($this->m_imap_stream, $msg_uid, "INBOX.{$folder}", CP_UID))
+            {
+                @imap_expunge($this->m_imap_stream);
+                return true;
+            }
+            
+        }
+        
+        return false;
+    }
+    
+    /** Read the mail. NOTE: no need to open IMAP. Returns collection of Email instances */
     public function read($filter = 'ALL', $max_len = 0)
     {
         $emails = array(); // return
         
-        if ($this->m_imap_stream)
+        // Open read-only stream
+        $authhost = "{".$this->m_server.":".$this->m_port.$this->m_service."}INBOX";
+        $stream = @imap_open($authhost, $this->m_user, $this->m_password, OP_READONLY);
+        
+        if ($stream)
         {
-            $msg_ids = @imap_search($this->m_imap_stream, $filter);
+            $msg_ids = @imap_search($stream, $filter);
             
             if ($msg_ids)
             {
                 foreach ($msg_ids as $msg_id)
                 {
-                    $msg = @imap_headerinfo($this->m_imap_stream , $msg_id);
+                    $msg = @imap_headerinfo($stream , $msg_id);
                     
                     if ($msg)
                     {
-                        $struct = @imap_fetchstructure($this->m_imap_stream, $msg_id);
+                        $struct = @imap_fetchstructure($stream, $msg_id);
                         
                         if ($struct)
                         {
@@ -76,10 +106,10 @@ class EmailServer
                             switch ($struct->type)
                             {
                                 case 0: // text
-                                    $body = @imap_body($this->m_imap_stream, $msg_id);
+                                    $body = @imap_body($stream, $msg_id);
                                     break;
                                 case 1: // multipart
-                                    $body = @imap_fetchbody($this->m_imap_stream, $msg_id, '1');
+                                    $body = @imap_fetchbody($stream, $msg_id, '1');
                                     break;
                                     
                                 case 2: // message
@@ -101,7 +131,7 @@ class EmailServer
                                 $from_charset = null;
                                 
                                 // Remember to mailbox sequence number
-                                $uid = @imap_uid($this->m_imap_stream, $msg_id);
+                                $uid = @imap_uid($stream, $msg_id);
                                 $email->set_msg_uid($uid);
                                 
                                 // Set TO info
@@ -117,7 +147,7 @@ class EmailServer
                                 $email->set_from($from_address);
                                 
                                 // Detect encoding
-                                $from_charset = self::charset_from_string(@imap_fetchheader($this->m_imap_stream, $msg_id));
+                                $from_charset = self::charset_from_string(@imap_fetchheader($stream, $msg_id));
                                 if (!$from_charset) $from_charset = self::charset_from_string($from_name);
                                 if (!$from_charset) $from_charset = self::charset_from_string($msg->subject);
                                 
@@ -209,34 +239,14 @@ class EmailServer
                     }
                 }
             }
+            
+            @imap_close($stream);
         }
         
         return $emails;
     }
     
-    /////////////////////////////////////////////////////////////////////////
-    public function move($msg_uid, $folder, $is_uid = true)
-    {
-        if ($this->m_imap_stream)
-        {
-            return @imap_mail_move($this->m_imap_stream , $msg_uid, "INBOX.{$folder}", $is_uid ? FT_UID : 0);
-        }
-        
-        return false;
-    }
-    
-    /////////////////////////////////////////////////////////////////////////
-    public function delete($msg_uid, $is_uid = true)
-    {
-        if ($this->m_imap_stream)
-        {
-            return @imap_delete($this->m_imap_stream , $msg_uid, $is_uid ? FT_UID : 0);
-        }
-            
-        return false;
-    }
-    
-    /////////////////////////////////////////////////////////////////////////
+    /** TODO */
     static protected function mime_header_decode($str, $to_charset, $from_charset)
     {
         $elements = imap_mime_header_decode($str);
@@ -251,7 +261,7 @@ class EmailServer
                 return $str;
     }
     
-    /////////////////////////////////////////////////////////////////////////
+    /** TODO */
     static protected function convert_charset($str, $to_charset, $from_charset)
     {
         $to_charset = strtolower($to_charset);
@@ -287,7 +297,7 @@ class EmailServer
                 return $str;
     }
     
-    /////////////////////////////////////////////////////////////////////////
+    /** TODO */
     static protected function charset_from_string($str)
     {
         if (stristr($str, 'KOI8-R')) return 'KOI8-R';
@@ -299,7 +309,7 @@ class EmailServer
         return null;
     }
     
-    /////////////////////////////////////////////////////////////////////////
+    /** TODO */
     static protected function utf8_to_win($fcontents)
     {
         $out = $c1 = '';
