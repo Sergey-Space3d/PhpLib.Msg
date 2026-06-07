@@ -7,8 +7,10 @@ class Email extends QueueMessage
 	const BR = '<br/>';
 	const CRLF = "\r\n";
 
+	protected $msg_uid = null;
     protected $from_name = null;
     protected $cc = array();
+    protected $ip = null;
     
     /** Test address */
     public static $TestTo =null;
@@ -56,12 +58,31 @@ class Email extends QueueMessage
 	    
 	    return true;
 	}
+	
+	public function get_msg_uid() { return $this->msg_uid; }
+	public function set_msg_uid($val) { $this->msg_uid = $val; }
 
-	public function get_from_name()	{ return $this->from_name; }
-	public function set_from_name($val)	{ $this->from_name = $val; }
+	public function get_from_name() { return $this->from_name; }
+	public function set_from_name($val) { $this->from_name = $val; }
 
 	public function get_cc() { return $this->cc; }
 	public function add_cc($cc, $cc_name=null) { if ($this->validate($cc)) $this->cc[$cc] = $cc_name; }
+	
+	public function get_ip() { return $this->ip; }
+	public function set_ip($val) { $this->ip = $val; }
+	
+	public function get_ip_group() 
+	{ 
+        $ip_group = null;
+	   
+        if ($this->ip)
+        {
+            $arr = explode('.', $this->ip);
+            $ip_group = "{$arr[0]}.{$arr[1]}.{$arr[2]}";
+        }
+        
+        return $ip_group; 
+	}
 	
 	/** Append original email */
 	public function append_original_email(Email $email)

@@ -6,28 +6,35 @@ class EmailServer
 {
     protected $m_server;
     protected $m_port;
+    protected $m_service;
     protected $m_user;
     protected $m_password;
     protected $m_imap_stream = null;
     
     /////////////////////////////////////////////////////////////////////////
-    public function __construct($server, $port, $user, $password)
+    public function __construct($server, $port, $service, $user, $password)
     {
         $this->m_server = $server;
         $this->m_port = $port;
+        $this->m_service = $service;
         $this->m_user = $user;
         $this->m_password = $password;
     }
     
-    /////////////////////////////////////////////////////////////////////////
-    public function open()
+    public function pop_errors()
     {
-        if ($this->m_imap_stream)
-            $this->close();
-            
-            $authhost = "{".$this->m_server.":".$this->m_port."/pop3/notls}INBOX";
-            $this->m_imap_stream = @imap_open($authhost, $this->m_user, $this->m_password);
-            return $this->m_imap_stream != null;
+        return @imap_errors();
+    }
+    
+    /////////////////////////////////////////////////////////////////////////
+    public function open($flags = 0)
+    {
+        if ($this->m_imap_stream) $this->close();
+        
+        $authhost = "{".$this->m_server.":".$this->m_port.$this->m_service."}INBOX";
+        $this->m_imap_stream = @imap_open($authhost, $this->m_user, $this->m_password, $flags);
+        
+        return $this->m_imap_stream != null;
     }
     
     /////////////////////////////////////////////////////////////////////////
@@ -95,14 +102,13 @@ class EmailServer
                                 
                                 // Remember to mailbox sequence number
                                 $uid = @imap_uid($this->m_imap_stream, $msg_id);
-                                $email->set_message_number($uid);
+                                $email->set_msg_uid($uid);
                                 
                                 // Set TO info
                                 $to = is_array($msg->to) ? array_shift($msg->to) : $msg->to;
                                 //$to_address = $to->mailbox . "@" . $to->host;
                                 $to_name = $to->personal;
-                                $email->set_to($this->m_user); // use real mailbox name
-                                $email->set_to_name($to_name);
+                                $email->set_to($this->m_user, $to_name); // use real mailbox name
                                 
                                 // Set FROM info
                                 $from = is_array($msg->from) ? array_shift($msg->from) : $msg->from;
@@ -121,18 +127,23 @@ class EmailServer
                                 // Set CC info
                                 if (is_array($msg->cc))
                                 {
-                                    $cc = array_shift($msg->cc);
-                                    $cc_address = $cc->mailbox . "@" . $cc->host;
-                                    $cc_name = $cc->personal;
-                                    $email->set_cc($cc_address);
-                                    
-                                    $cc_name = self::mime_header_decode($cc_name, $to_charset, $from_charset);
-                                    $email->set_cc_name($cc_name);
+                                    foreach ($msg->cc as $cc)
+                                    {
+                                        $cc_address = $cc->mailbox . "@" . $cc->host;
+                                        $cc_name = $cc->personal;
+                                        $cc_name = self::mime_header_decode($cc_name, $to_charset, $from_charset);
+                                        
+                                        $email->add_cc($cc_address, $cc_name);
+                                    }
                                 }
+                                
+                                $domain_from = explode('.', $from->host);
+                                $domain_from = $domain_from[count($domain_from) - 2].'.'.$domain_from[count($domain_from) - 1];
+                                $email->set_ip(gethostbyname($domain_from));
                                 
                                 // Decode subject line
                                 $title = self::mime_header_decode($msg->subject, $to_charset, $from_charset);
-                                $email->set_title($title);
+                                $email->set_subject($title);
                                 
                                 // Decode message's body
                                 switch ($struct->encoding)
@@ -176,37 +187,6 @@ class EmailServer
                                         break;
                                 }
                                 
-                                $language = 'EN';
-                                
-                                switch ($from_charset)
-                                {
-                                    case 'windows-1251':
-                                    case 'KOI8-R':
-                                    case 'KOI8-U':
-                                    case 'UTF-8':
-                                        $language = 'RU';
-                                        break;
-                                    default:
-                                        break;
-                                }
-                                
-                                // Decode from mime
-                                $body = self::convert_charset($body, $to_charset, $from_charset);
-                                
-                                /*
-                                 if ($struct->encoding == 0 && (!$from_charset || $from_charset == 'windows-1251') && strlen($body) > 100 && !strstr(trim($body), ' '))
-                                 {
-                                 // It looks like the message is encoded in envelope
-                                 $body = imap_base64($body);
-                                 $body = convert_cyr_string ($body, 'k', 'w');
-                                 $language = 'RU';
-                                 }
-                                 */
-                                //$body = 'enc num: '.$struct->encoding.' enc det: '.$from_charset.'-->'.$body;
-                                
-                                // Set the suggested language
-                                $email->set_language($language);
-                                
                                 // Strip body tags, optionally limit to max. length chars
                                 $body = strip_tags($body);
                                 
@@ -215,15 +195,15 @@ class EmailServer
                                 while ($n > 0)
                                     $body = str_replace("\r\n\r\n\r\n", "\r\n\r\n", $body, $n);
                                     
-                                    //$body = htmlspecialchars($body, ENT_NOQUOTES);
-                                    if ($max_len > 0) $body = substr($body, 0, $max_len);
-                                    $email->set_message($body);
-                                    
-                                    // Set the timestamp
-                                    $email->set_ts($msg->udate);
-                                    
-                                    // Add to array
-                                    $emails[] = $email;
+                                //$body = htmlspecialchars($body, ENT_NOQUOTES);
+                                if ($max_len > 0) $body = substr($body, 0, $max_len);
+                                $email->set_content(array($body));
+                                
+                                // Set the timestamp
+                                $email->set_ts($msg->udate);
+                                
+                                // Add to array
+                                $emails[] = $email;
                             }
                         }
                     }
@@ -231,16 +211,29 @@ class EmailServer
             }
         }
         
-        return count($emails) ? $emails : null;
+        return $emails;
     }
     
     /////////////////////////////////////////////////////////////////////////
-    public function delete($msg_id, $is_uid = true)
+    public function move($msg_uid, $folder, $is_uid = true)
     {
         if ($this->m_imap_stream)
-            return @imap_delete($this->m_imap_stream , $msg_id, $is_uid ? FT_UID : 0);
+        {
+            return @imap_mail_move($this->m_imap_stream , $msg_uid, "INBOX.{$folder}", $is_uid ? FT_UID : 0);
+        }
+        
+        return false;
+    }
+    
+    /////////////////////////////////////////////////////////////////////////
+    public function delete($msg_uid, $is_uid = true)
+    {
+        if ($this->m_imap_stream)
+        {
+            return @imap_delete($this->m_imap_stream , $msg_uid, $is_uid ? FT_UID : 0);
+        }
             
-            return false;
+        return false;
     }
     
     /////////////////////////////////////////////////////////////////////////
