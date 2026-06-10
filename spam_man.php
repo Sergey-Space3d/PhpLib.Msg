@@ -53,8 +53,8 @@ class SpamMan extends CDbRecordManSingleton
         return null;
     }
     
-    /** Mark the value as a spam of curtain type */
-    public function mark_spam($value, $type) 
+    /** Mark the value as a spam of curtain type.Returns true if spam */
+    public function mark_spam($value, $type, $is_spam = false) 
     {
         $value = strtoupper($value);
         $spam = $this->get_instance("_value='{$value}' AND _type={$type}");
@@ -69,7 +69,10 @@ class SpamMan extends CDbRecordManSingleton
         }
         
         // Increase the mark count
-        $spam->set_mark_count($spam->get_mark_count() + 1, true);
+        $count = $is_spam ? Spam::COUNT_THRESHOLD : $spam->get_mark_count() + 1;
+        $spam->set_mark_count($count, true);
+        
+        return $count >= Spam::COUNT_THRESHOLD;
     }
 }
 ?>

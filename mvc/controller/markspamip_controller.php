@@ -15,9 +15,11 @@ class MarkSpamIpController extends CController
     protected function process()
     {
         $ip = $this->get_value('ip');
-        SpamMan::Instance()->mark_spam($ip, Spam::TYPE_IP);
+        $is_spam = $this->get_value('is_spam');
+        SpamMan::Instance()->mark_spam($ip, Spam::TYPE_IP, $is_spam);
         
-        CHtmlPage::set_last_info("IP {$ip} was marked as spam");
+        $str = $is_spam ? "IP {$ip} was set as spam" : "IP {$ip} was marked";
+        CHtmlPage::set_last_info($str);
         return true;
     }
 }

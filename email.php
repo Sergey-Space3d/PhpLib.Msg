@@ -7,6 +7,7 @@ class Email extends QueueMessage
 	const BR = '<br/>';
 	const CRLF = "\r\n";
 
+	protected $mail_server = null;
 	protected $msg_uid = null;
     protected $from_name = null;
     protected $cc = array();
@@ -59,6 +60,9 @@ class Email extends QueueMessage
 	    return true;
 	}
 	
+	public function get_mail_server() { return $this->mail_server; }
+	public function set_mail_server($val) { $this->mail_server = $val; }
+	
 	public function get_msg_uid() { return $this->msg_uid; }
 	public function set_msg_uid($val) { $this->msg_uid = $val; }
 
@@ -78,7 +82,8 @@ class Email extends QueueMessage
         if ($this->ip)
         {
             $arr = explode('.', $this->ip);
-            $ip_group = "{$arr[0]}.{$arr[1]}.{$arr[2]}";
+            $ip_group = "{$arr[0]}.{$arr[1]}";
+            if ($arr[2]) $ip_group .= ".{$arr[2]}";
         }
         
         return $ip_group; 

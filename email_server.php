@@ -65,19 +65,14 @@ class EmailServer
     {
         if ($this->m_imap_stream)
         {
-            if (@imap_mail_move($this->m_imap_stream, $msg_uid, "INBOX.{$folder}", CP_UID))
-            {
-                @imap_expunge($this->m_imap_stream);
-                return true;
-            }
-            
+            return @imap_mail_move($this->m_imap_stream, $msg_uid, "INBOX.{$folder}", CP_UID);
         }
         
         return false;
     }
     
     /** Read the mail. NOTE: no need to open IMAP. Returns collection of Email instances */
-    public function read($filter = 'ALL', $max_len = 0)
+    public function read($filter = 'ALL', $max_len = 0, $header_only = false)
     {
         $emails = array(); // return
         
@@ -97,6 +92,68 @@ class EmailServer
                     
                     if ($msg)
                     {
+                        // Add new email to array
+                        $email = new Email;
+                        $emails[] = $email;
+                        
+                        // Set the timestamp
+                        $email->set_ts($msg->udate);
+                        
+                        // Remember the mail server
+                        $email->set_mail_server($this->m_server);
+                        
+                        // Remember to mailbox sequence number
+                        $uid = @imap_uid($stream, $msg_id);
+                        $email->set_msg_uid($uid);
+                        
+                        // Set TO info
+                        $to = is_array($msg->to) ? array_shift($msg->to) : $msg->to;
+                        //$to_address = $to->mailbox . "@" . $to->host;
+                        $to_name = $to->personal;
+                        $email->set_to($this->m_user, $to_name); // use real mailbox name
+                        
+                        // Set FROM info
+                        $from = is_array($msg->from) ? array_shift($msg->from) : $msg->from;
+                        $from_address = $from->mailbox . "@" . $from->host;
+                        $from_name = $from->personal;
+                        $email->set_from($from_address);
+                        
+                        // Detect encoding
+                        $to_charset = 'UTF-8'; // TODO: hard-coded for now
+                        $from_charset = null;
+                        
+                        $from_charset = self::charset_from_string(@imap_fetchheader($stream, $msg_id));
+                        if (!$from_charset) $from_charset = self::charset_from_string($from_name);
+                        if (!$from_charset) $from_charset = self::charset_from_string($msg->subject);
+                        
+                        $from_name = self::mime_header_decode($from_name, $to_charset, $from_charset);
+                        $email->set_from_name($from_name);
+                        
+                        // Set CC info
+                        if (is_array($msg->cc))
+                        {
+                            foreach ($msg->cc as $cc)
+                            {
+                                $cc_address = $cc->mailbox . "@" . $cc->host;
+                                $cc_name = $cc->personal;
+                                $cc_name = self::mime_header_decode($cc_name, $to_charset, $from_charset);
+                                
+                                $email->add_cc($cc_address, $cc_name);
+                            }
+                        }
+                        
+                        $domain_from = explode('.', $from->host);
+                        $domain_from = $domain_from[count($domain_from) - 2].'.'.$domain_from[count($domain_from) - 1];
+                        $email->set_ip(gethostbyname($domain_from));
+                        
+                        // Decode subject line
+                        $title = self::mime_header_decode($msg->subject, $to_charset, $from_charset);
+                        $email->set_subject($title);
+                        
+                        // Skip the body
+                        if ($header_only) continue;
+                        
+                        // Read the message structure
                         $struct = @imap_fetchstructure($stream, $msg_id);
                         
                         if ($struct)
@@ -124,57 +181,6 @@ class EmailServer
                             
                             if ($body)
                             {
-                                $email = new Email;
-                                
-                                // TODO: hard-coded for now
-                                $to_charset = 'UTF-8';
-                                $from_charset = null;
-                                
-                                // Remember to mailbox sequence number
-                                $uid = @imap_uid($stream, $msg_id);
-                                $email->set_msg_uid($uid);
-                                
-                                // Set TO info
-                                $to = is_array($msg->to) ? array_shift($msg->to) : $msg->to;
-                                //$to_address = $to->mailbox . "@" . $to->host;
-                                $to_name = $to->personal;
-                                $email->set_to($this->m_user, $to_name); // use real mailbox name
-                                
-                                // Set FROM info
-                                $from = is_array($msg->from) ? array_shift($msg->from) : $msg->from;
-                                $from_address = $from->mailbox . "@" . $from->host;
-                                $from_name = $from->personal;
-                                $email->set_from($from_address);
-                                
-                                // Detect encoding
-                                $from_charset = self::charset_from_string(@imap_fetchheader($stream, $msg_id));
-                                if (!$from_charset) $from_charset = self::charset_from_string($from_name);
-                                if (!$from_charset) $from_charset = self::charset_from_string($msg->subject);
-                                
-                                $from_name = self::mime_header_decode($from_name, $to_charset, $from_charset);
-                                $email->set_from_name($from_name);
-                                
-                                // Set CC info
-                                if (is_array($msg->cc))
-                                {
-                                    foreach ($msg->cc as $cc)
-                                    {
-                                        $cc_address = $cc->mailbox . "@" . $cc->host;
-                                        $cc_name = $cc->personal;
-                                        $cc_name = self::mime_header_decode($cc_name, $to_charset, $from_charset);
-                                        
-                                        $email->add_cc($cc_address, $cc_name);
-                                    }
-                                }
-                                
-                                $domain_from = explode('.', $from->host);
-                                $domain_from = $domain_from[count($domain_from) - 2].'.'.$domain_from[count($domain_from) - 1];
-                                $email->set_ip(gethostbyname($domain_from));
-                                
-                                // Decode subject line
-                                $title = self::mime_header_decode($msg->subject, $to_charset, $from_charset);
-                                $email->set_subject($title);
-                                
                                 // Decode message's body
                                 switch ($struct->encoding)
                                 {
@@ -203,9 +209,11 @@ class EmailServer
                                     case 2: // BINARY
                                         $body = imap_binary($body);
                                         if (strlen($body) > 100 && !strstr(trim($body), ' '))
+                                        {
                                             $body = base64_decode($body);
-                                            $body = quoted_printable_decode($body);
-                                            break;
+                                        }
+                                        $body = quoted_printable_decode($body);
+                                        break;
                                     case 3: // BASE64
                                         $body = base64_decode($body);
                                         $body = quoted_printable_decode($body);
@@ -218,22 +226,12 @@ class EmailServer
                                 }
                                 
                                 // Strip body tags, optionally limit to max. length chars
-                                $body = strip_tags($body);
+                                $body = self::extract_body($body);
                                 
-                                // Remove extra newlines
-                                $n = 1;
-                                while ($n > 0)
-                                    $body = str_replace("\r\n\r\n\r\n", "\r\n\r\n", $body, $n);
                                     
                                 //$body = htmlspecialchars($body, ENT_NOQUOTES);
                                 if ($max_len > 0) $body = substr($body, 0, $max_len);
                                 $email->set_content(array($body));
-                                
-                                // Set the timestamp
-                                $email->set_ts($msg->udate);
-                                
-                                // Add to array
-                                $emails[] = $email;
                             }
                         }
                     }
@@ -244,6 +242,63 @@ class EmailServer
         }
         
         return $emails;
+    }
+    
+    static protected function extract_body($text)
+    {
+        $reduce_to_2 = function($find, $replace, $str)
+        {
+            $n = 1;
+            while ($n > 0)
+            {
+                $str = str_replace($find, $replace, $str, $n);
+            }
+            
+            return $str;
+        };
+        
+        $text = trim($text);
+        
+        $matches = array(); // try extracting <body> element
+        if (preg_match('/(?:<body[^>]*>)(.*)<\/body>/isU', $text, $matches)) 
+        {
+            $text = $matches[1];
+        }
+        
+        $text = strip_tags($text);
+        $text = str_replace(array('<br>', '<BR>', '<BR/>'), '<br/>', $text);
+        $text = str_replace(array('&nbsp;', '&zwnj;'), '', $text);
+        $is_html = strpos($text, '<br/>') !== false;
+        
+        if ($is_html)
+        {
+            // Remove all newlines
+            $text = str_replace(array("\r", "\n"), '', $text);
+            
+            // Remove redundant spaces
+            $text = str_replace(array('<br/> ', '<br/>  '), '<br/>', $text);
+            
+            // Allow 2 breaks max
+            $text = $reduce_to_2('<br/><br/><br/>', '<br/><br/>', $text);
+        }
+        else 
+        {
+            //$text = str_replace('>', '&gt;', $text);
+            //$text = str_replace('<', '&lt;', $text);
+            
+            // Remove CR characters
+            $text = str_replace("\r\n", "\n", $text);
+            
+            // Remove redundant spaces
+            $text = str_replace(array("\n ", "\n  "), "\n", $text);
+            
+            // Allow 2 lewlines max
+            $text = $reduce_to_2("\n\n\n", "\n\n", $text);
+        }
+        
+        
+        
+        return $text;
     }
     
     /** TODO */

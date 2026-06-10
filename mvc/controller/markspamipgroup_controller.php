@@ -15,9 +15,11 @@ class MarkSpamIpGroupController extends CController
     protected function process()
     {
         $ip_group = $this->get_value('ip_group');
-        SpamMan::Instance()->mark_spam($ip_group, Spam::TYPE_IP_GROUP);
+        $is_spam = $this->get_value('is_spam');
+        $is_spam = SpamMan::Instance()->mark_spam($ip_group, Spam::TYPE_IP_GROUP, $is_spam);
         
-        CHtmlPage::set_last_info("IP group {$ip_group} was marked as spam");
+        $str = $is_spam ? "IP group {$ip_group} was set as spam" : "IP group {$ip_group} was marked";
+        CHtmlPage::set_last_info($str);
         return true;
     }
 }

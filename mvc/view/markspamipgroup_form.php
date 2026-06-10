@@ -10,10 +10,30 @@ class MarkSpamIpGroupForm extends CForm
     {
         @extract($args);
         
-        $this->add_inner(new CHtmlHidden('ip_group', $ip_group));
-        $this->set_confirm("Confirm marking IP group {$ip_group} as spam");
+        $confirm = null;
+        $submit = null;
         
-        $ctrl = new CHtmlSubmit("Mark IP Group {$ip_group} as Spam");
+        if (is_array($ip_groups))
+        {
+            $ctrl = new CHtmlCbox('ip_group', $ip_group);
+            $ctrl->add_items($ip_groups);
+            $this->add_inner($ctrl);
+            
+            $confirm = "Confirm setting IP group as spam";
+            $submit = "Set IP Group as Spam";
+        }
+        else
+        {
+            $this->add_inner(new CHtmlHidden('ip_group', $ip_group));
+            
+            $confirm = "Confirm marking IP group {$ip_group}";
+            $submit = "Mark IP Group {$ip_group}";
+        }
+        
+        $this->add_inner(new CHtmlHidden('is_spam', is_array($ip_groups)));
+        $this->set_confirm($confirm);
+        
+        $ctrl = new CHtmlSubmit($submit);
         $ctrl->disable_on_click();
         $this->add_inner($ctrl);
     }
