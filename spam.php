@@ -15,6 +15,7 @@ class Spam extends CDbRecord
     const TYPE_IP_GROUP = 2;
     const TYPE_DOMAIN = 3;
     const TYPE_FROM_ADDRESS = 4;
+    const TYPE_TEXT = 5;
     
     const COUNT_THRESHOLD = 5;
     const FOLDER = 'Junk';

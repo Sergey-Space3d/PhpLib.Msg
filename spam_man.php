@@ -20,24 +20,40 @@ class SpamMan extends CDbRecordManSingleton
         if ($spams) foreach ($spams as $spam)
         {
             $value = null;
+            $type = $spam->get_type();
             
-            switch ($spam->get_type())
+            switch ($type)
             {
                 case Spam::TYPE_IP:
-                    $value = $email->get_ip();
+                    $value = $email->get_sender_ip();
                     break;
                     
                 case Spam::TYPE_IP_GROUP:
-                    $value = $email->get_ip_group();
+                    $value = $email->get_sender_ip_group();
                     break;
                     
-                case Spam::TYPE_FROM_ADDRESS: // TODO
-                case Spam::TYPE_DOMAIN: // TODO
-                default:
+                case Spam::TYPE_DOMAIN:
+                    $value = $email->get_sender_domain();
+                    break;
+                    
+                case Spam::TYPE_FROM_ADDRESS:
+                    $value = $email->get_from();
+                    break;
+                    
+                case Spam::TYPE_TEXT:
+                    $value = implode(' ', $email->get_content())." {$email->get_subject()}";
+                    $value = str_replace(array("\n", "\t", "<br/>"), ' ', $value);
+                    break;
+                    
+                default: // Unknown type
                     break;
             }
             
-            if ($value == $spam->get_value())
+            $match = ($type == Spam::TYPE_TEXT) ? 
+            preg_match($spam->get_value(), $value) : 
+            strtoupper($value) == $spam->get_value();
+            
+            if ($match)
             {
                 // Update the mark count
                 $mark_count = max($mark_count, $spam->get_mark_count());
@@ -56,7 +72,10 @@ class SpamMan extends CDbRecordManSingleton
     /** Mark the value as a spam of curtain type.Returns true if spam */
     public function mark_spam($value, $type, $is_spam = false) 
     {
-        $value = strtoupper($value);
+        $value = trim($value);
+        if (!strlen($value)) return false;
+        if ($type != Spam::TYPE_TEXT) $value = strtoupper($value);
+        
         $spam = $this->get_instance("_value='{$value}' AND _type={$type}");
         
         if (!$spam)

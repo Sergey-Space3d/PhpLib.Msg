@@ -142,13 +142,12 @@ class EmailServer
                             }
                         }
                         
-                        $domain_from = explode('.', $from->host);
-                        $domain_from = $domain_from[count($domain_from) - 2].'.'.$domain_from[count($domain_from) - 1];
-                        $email->set_ip(gethostbyname($domain_from));
-                        
                         // Decode subject line
                         $title = self::mime_header_decode($msg->subject, $to_charset, $from_charset);
                         $email->set_subject($title);
+                        
+                        // Set the sender's IP and domain
+                        self::setup_sender($email, $msg);
                         
                         // Skip the body
                         if ($header_only) continue;
@@ -228,9 +227,8 @@ class EmailServer
                                 // Strip body tags, optionally limit to max. length chars
                                 $body = self::extract_body($body);
                                 
-                                    
                                 //$body = htmlspecialchars($body, ENT_NOQUOTES);
-                                if ($max_len > 0) $body = substr($body, 0, $max_len);
+                                if ($max_len > 0 && strlen($body) > $max_len) $body = substr($body, 0, $max_len).'...';
                                 $email->set_content(array($body));
                             }
                         }
@@ -244,17 +242,66 @@ class EmailServer
         return $emails;
     }
     
+    static protected function setup_sender(Email $email, $msg)
+    {
+        $setup = function(Email $email, $sender)
+        {
+            // Determine sender's domain and ip
+            $domain_by_host = function($host)
+            {
+                if (!$host) return null;
+                $arr = explode('.', $host);
+                
+                $n = count($arr);
+                if ($n < 2) return null;
+                
+                return $arr[$n - 2].'.'.$arr[$n - 1];
+            };
+            
+            $ip_by_domain = function($domain)
+            {
+                $ip = gethostbyname($domain);
+                return $ip == $domain ? null : $ip;
+            };
+            
+            if (!$sender || !$sender->host) return false;
+            
+            $domain = $domain_by_host($sender->host);
+            if (!$domain) return false;
+            
+            $email->set_sender_domain($domain);
+            
+            $ip = $ip_by_domain($domain);
+            if (!$ip) return false;
+            
+            $email->set_sender_ip($ip);
+            return true;
+        };
+        
+        return 
+        $setup($email, is_array($msg->sender) ? array_shift($msg->sender) : $msg->sender) ||
+        $setup($email, is_array($msg->reply_to) ? array_shift($msg->reply_to) : $msg->reply_to) ||
+        $setup($email, is_array($msg->from) ? array_shift($msg->from) : $msg->from);
+    }
+    
     static protected function extract_body($text)
     {
         $reduce_to_2 = function($find, $replace, $str)
         {
             $n = 1;
-            while ($n > 0)
-            {
-                $str = str_replace($find, $replace, $str, $n);
-            }
-            
+            while ($n > 0) $str = str_replace($find, $replace, $str, $n);
             return $str;
+        };
+        
+        $remove_spaces_between_breaks = function($break, $str)
+        {
+            $arr = array();
+            foreach (explode($break, $str) as $el)
+            {
+                $el2 = trim($el);
+                if (strlen($el2) || !strlen($el)) $arr[] = $el2;
+            }
+            return implode($break, $arr);
         };
         
         $text = trim($text);
@@ -276,21 +323,18 @@ class EmailServer
             $text = str_replace(array("\r", "\n"), '', $text);
             
             // Remove redundant spaces
-            $text = str_replace(array('<br/> ', '<br/>  '), '<br/>', $text);
+            $text = $remove_spaces_between_breaks('<br/>', $text);
             
             // Allow 2 breaks max
             $text = $reduce_to_2('<br/><br/><br/>', '<br/><br/>', $text);
         }
         else 
         {
-            //$text = str_replace('>', '&gt;', $text);
-            //$text = str_replace('<', '&lt;', $text);
-            
             // Remove CR characters
             $text = str_replace("\r\n", "\n", $text);
             
             // Remove redundant spaces
-            $text = str_replace(array("\n ", "\n  "), "\n", $text);
+            $text = $remove_spaces_between_breaks("\n", $text);
             
             // Allow 2 lewlines max
             $text = $reduce_to_2("\n\n\n", "\n\n", $text);

@@ -11,7 +11,8 @@ class Email extends QueueMessage
 	protected $msg_uid = null;
     protected $from_name = null;
     protected $cc = array();
-    protected $ip = null;
+    protected $sender_ip = null;
+    protected $sender_domain = null;
     
     /** Test address */
     public static $TestTo =null;
@@ -72,18 +73,20 @@ class Email extends QueueMessage
 	public function get_cc() { return $this->cc; }
 	public function add_cc($cc, $cc_name=null) { if ($this->validate($cc)) $this->cc[$cc] = $cc_name; }
 	
-	public function get_ip() { return $this->ip; }
-	public function set_ip($val) { $this->ip = $val; }
+	public function get_sender_domain() { return $this->sender_domain; }
+	public function set_sender_domain($val) { $this->sender_domain = $val; }
 	
-	public function get_ip_group() 
+	public function get_sender_ip() { return $this->sender_ip; }
+	public function set_sender_ip($val) { $this->sender_ip = $val; }
+	
+	public function get_sender_ip_group() 
 	{ 
         $ip_group = null;
 	   
-        if ($this->ip)
+        if ($this->sender_ip)
         {
-            $arr = explode('.', $this->ip);
-            $ip_group = "{$arr[0]}.{$arr[1]}";
-            if ($arr[2]) $ip_group .= ".{$arr[2]}";
+            $arr = explode('.', $this->sender_ip);
+            $ip_group = "{$arr[0]}.{$arr[1]}.{$arr[2]}";
         }
         
         return $ip_group; 
