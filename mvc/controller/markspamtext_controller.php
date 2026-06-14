@@ -31,12 +31,18 @@ class MarkSpamTextController extends CController
             return false;
         }
         
-        // Compose search pattern
-        $arr = explode('|', $value);
-        foreach ($arr as &$el) $el = implode('.*?', explode(' ', $el));
-        if (count($arr) > 1) foreach ($arr as &$el) $el = "({$el})";
-        $value = implode('', $arr);
-        $value = "/{$value}/i";
+        if ($value[0] != '/')
+        {
+            // Compose search pattern
+            $arr = explode('|', $value);
+            foreach ($arr as &$el) 
+            {
+                $el = trim($el);
+                $el = implode('.*?', explode(' ', $el));
+            }
+            $value = implode('|', $arr);
+            $value = "/{$value}/i";
+        }
         
         SpamMan::Instance()->mark_spam($value, Spam::TYPE_TEXT, $is_spam);
         
