@@ -15,6 +15,7 @@ $__sudir = $__dir.'/extra';
 $__classes = array(
     'EmailServer'=>$__dir.'/email_server.php',
     'EmailMan'=>$__dir.'/email_man.php',
+    'EmailHeader'=>$__dir.'/email_header.php',
     'Email'=>$__dir.'/email.php',
     'SpamMan'=>$__dir.'/spam_man.php',
     'Spam'=>$__dir.'/spam.php',

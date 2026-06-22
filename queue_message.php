@@ -4,29 +4,18 @@
 
 abstract class QueueMessage extends CDbQueueRecord
 {
-    protected $from = null;
-    protected $to = array();
-    protected $subject = null;
     protected $content = array();
-    protected $attached = array();
+    protected $attachments = array();
     private $err = null;
     
-    public function get_from() { return $this->from; }
-    public function set_from($val) { if ($this->validate($val)) $this->from = $val; }
-    
-    public function get_to() { return $this->to; }
-    public function set_to($to, $to_name=null) { $this->to = array(); $this->add_to($to, $to_name); }
-    public function add_to($to, $to_name=null) { if ($this->validate($to)) $this->to[$to] = $to_name; }
-    
-    public function get_subject() { return $this->subject; }
-    public function set_subject($val) { $this->subject = $val; }
-    
-    public function get_content() { return $this->content; }
+    public function get_content($glue = null) { return $glue == null ? $this->content : implode($glue, $this->content); }
     public function set_content(array $content) { $this->content = $content; }
-    public function add_content($line) { if ($line) $this->content[] = $line; }
+    public function add_line($line) { if ($line) $this->content[] = $line; }
     public function add_newline() { $this->content[] = ''; }
     
-    public function get_attached() { return $this->attached; }
+    public function get_attachments() { return $this->attachments; }
+    public function set_attachments(array $attachments) { $this->attachments = $attachments; }
+    public function add_attachment($attachment) { $this->attachments[] = $attachment; }
     
     // Error ----------------------------------------------------------------
     
@@ -37,6 +26,27 @@ abstract class QueueMessage extends CDbQueueRecord
     protected final function set_last_error($error) { $this->err = $error; }
     
     // Abstracts ------------------------------------------------------------
+    
+    /** Get subject line */
+    abstract public function get_subject();
+    
+    /** Set subject line */
+    abstract public function set_subject($val);
+    
+    /** Get FROM address (name is optional) */
+    abstract public function get_from(&$name = null);
+    
+    /** Set FROM address (name is optional). Returns true on success */
+    abstract public function set_from($val, $name = null);
+    
+    /** Get TO collection, as [address]=>[name] */
+    abstract public function get_to();
+    
+    /** Set TO address (name is optional). Returns true on success */
+    abstract public function set_to($val, $name=null);
+    
+    /** Add TO address (name is optional). Returns true on success */
+    abstract public function add_to($val, $name=null);
     
     /** Validate address */
     abstract public function validate($address);

@@ -96,8 +96,8 @@ class EmailServer
                         $email = new Email;
                         $emails[] = $email;
                         
-                        // Set the timestamp
-                        $email->set_ts($msg->udate);
+                        // Setup headers
+                        $email->Header->read($msg);
                         
                         // Remember the mail server
                         $email->set_mail_server($this->m_server);
@@ -106,48 +106,11 @@ class EmailServer
                         $uid = @imap_uid($stream, $msg_id);
                         $email->set_msg_uid($uid);
                         
-                        // Set TO info
-                        $to = is_array($msg->to) ? array_shift($msg->to) : $msg->to;
-                        //$to_address = $to->mailbox . "@" . $to->host;
-                        $to_name = $to->personal;
-                        $email->set_to($this->m_user, $to_name); // use real mailbox name
+                        // Set the timestamp
+                        $email->set_ts($msg->udate);
                         
-                        // Set FROM info
-                        $from = is_array($msg->from) ? array_shift($msg->from) : $msg->from;
-                        $from_address = $from->mailbox . "@" . $from->host;
-                        $from_name = $from->personal;
-                        $email->set_from($from_address);
-                        
-                        // Detect encoding
-                        $to_charset = 'UTF-8'; // TODO: hard-coded for now
-                        $from_charset = null;
-                        
-                        $from_charset = self::charset_from_string(@imap_fetchheader($stream, $msg_id));
-                        if (!$from_charset) $from_charset = self::charset_from_string($from_name);
-                        if (!$from_charset) $from_charset = self::charset_from_string($msg->subject);
-                        
-                        $from_name = self::mime_header_decode($from_name, $to_charset, $from_charset);
-                        $email->set_from_name($from_name);
-                        
-                        // Set CC info
-                        if (is_array($msg->cc))
-                        {
-                            foreach ($msg->cc as $cc)
-                            {
-                                $cc_address = $cc->mailbox . "@" . $cc->host;
-                                $cc_name = $cc->personal;
-                                $cc_name = self::mime_header_decode($cc_name, $to_charset, $from_charset);
-                                
-                                $email->add_cc($cc_address, $cc_name);
-                            }
-                        }
-                        
-                        // Decode subject line
-                        $title = self::mime_header_decode($msg->subject, $to_charset, $from_charset);
-                        $email->set_subject($title);
-                        
-                        // Set the sender's IP and domain
-                        self::setup_sender($email, $msg);
+                        // Process the sender's IPs and domains
+                        self::process_sender_domains($email, $msg);
                         
                         // Skip the body
                         if ($header_only) continue;
@@ -157,6 +120,9 @@ class EmailServer
                         
                         if ($struct)
                         {
+                            // Populate attachment list
+                            self::setup_attachments($email, $struct);
+                            
                             $body = null;
                             
                             switch ($struct->type)
@@ -186,23 +152,9 @@ class EmailServer
                                     case 0: // 7 BIT
                                     case 1: // 8BIT
                                         $body = quoted_printable_decode($body);
-                                        
-                                        switch ($from_charset)
+                                        if (strlen($body) > 100 && !strstr(trim($body), ' '))
                                         {
-                                            case 'UTF-8':
-                                                //break;
-                                            case 'KOI8-R':
-                                            case 'KOI8-U':
-                                            case 'windows-1251':
-                                            default:
-                                                if (strlen($body) > 100 && !strstr(trim($body), ' '))
-                                                {
-                                                    $body = base64_decode($body);
-                                                    
-                                                    if (!$from_charset)
-                                                        $from_charset = 'KOI8-R';
-                                                }
-                                                break;
+                                            $body = base64_decode($body);
                                         }
                                         break;
                                     case 2: // BINARY
@@ -242,7 +194,8 @@ class EmailServer
         return $emails;
     }
     
-    static protected function setup_sender(Email $email, $msg)
+    /** Process sender domains and IPs */
+    static protected function process_sender_domains(Email $email, $msg)
     {
         $setup = function(Email $email, $sender)
         {
@@ -284,6 +237,7 @@ class EmailServer
         $setup($email, is_array($msg->from) ? array_shift($msg->from) : $msg->from);
     }
     
+    /** Extract essential text from the message's body */
     static protected function extract_body($text)
     {
         $reduce_to_2 = function($find, $replace, $str)
@@ -340,118 +294,41 @@ class EmailServer
             $text = $reduce_to_2("\n\n\n", "\n\n", $text);
         }
         
-        
-        
         return $text;
     }
     
-    /** TODO */
-    static protected function mime_header_decode($str, $to_charset, $from_charset)
+    static protected function setup_attachments(Email $email, $struct)
     {
-        $elements = imap_mime_header_decode($str);
-        $str = null;
-        
-        foreach ($elements as $element)
-            $str .= $element->text;
-            
-            if ($to_charset && $from_charset)
-                return self::convert_charset($str, $to_charset, $from_charset);
-                
-                return $str;
-    }
-    
-    /** TODO */
-    static protected function convert_charset($str, $to_charset, $from_charset)
-    {
-        $to_charset = strtolower($to_charset);
-        $from_charset = strtolower($from_charset);
-        $to_charset_cyr = null;
-        $from_charset_cyr = null;
-        
-        switch ($to_charset)
+        if (isset($struct->parameters) && is_array($struct->parameters)) 
         {
-            case 'koi8-r': $to_charset_cyr = 'k'; break;
-            case 'koi8-u': $to_charset_cyr = 'k'; break;
-            case 'windows-1251': $to_charset_cyr = 'w'; break;
-            case 'iso8859-5': $to_charset_cyr = 'i'; break;
-            case 'x-cp866': $to_charset_cyr = 'a'; break;
-            case 'x-mac-cyrillic': $to_charset_cyr = 'm'; break;
+            foreach ($struct->parameters as $param) 
+            {
+                if (strtoupper($param->attribute) == 'FILENAME') 
+                {
+                    $email->add_attachment($param->value);
+                }
+            }
         }
         
-        switch ($from_charset)
+        if (isset($struct->dparameters) && is_array($struct->dparameters)) 
         {
-            case 'koi8-r': $from_charset_cyr = 'k'; break;
-            case 'koi8-u': $from_charset_cyr = 'k'; break;
-            case 'windows-1251': $from_charset_cyr = 'w'; break;
-            case 'iso8859-5': $from_charset_cyr = 'i'; break;
-            case 'x-cp866': $from_charset_cyr = 'a'; break;
-            case 'x-mac-cyrillic': $from_charset_cyr = 'm'; break;
+            foreach ($struct->dparameters as $param) 
+            {
+                if (strtoupper($param->attribute) == 'FILENAME')
+                {
+                    $email->add_attachment($param->value);
+                }
+            }
         }
         
-        if ($to_charset_cyr && $from_charset_cyr && $to_charset_cyr != $from_charset_cyr)
-            return convert_cyr_string($str, $from_charset_cyr, $to_charset_cyr);
-            else if ($to_charset == 'windows-1251' && $from_charset == 'utf-8')
-                return self::utf8_to_win($str);
-                
-                return $str;
-    }
-    
-    /** TODO */
-    static protected function charset_from_string($str)
-    {
-        if (stristr($str, 'KOI8-R')) return 'KOI8-R';
-        if (stristr($str, 'KOI8-U')) return 'KOI8-U';
-        if (stristr($str, 'UTF-8')) return 'UTF-8';
-        if (stristr($str, 'UTF-7')) return 'UTF-7';
-        if (stristr($str, 'windows-1251')) return 'windows-1251';
-        
-        return null;
-    }
-    
-    /** TODO */
-    static protected function utf8_to_win($fcontents)
-    {
-        $out = $c1 = '';
-        $byte2 = false;
-        for ($c = 0;$c < strlen($fcontents);$c++) {
-            $i = ord($fcontents[$c]);
-            if ($i <= 127) {
-                $out .= $fcontents[$c];
-            }
-            if ($byte2) {
-                $new_c2 = ($c1 & 3) * 64 + ($i & 63);
-                $new_c1 = ($c1 >> 2) & 5;
-                $new_i = $new_c1 * 256 + $new_c2;
-                if ($new_i == 1025) {
-                    $out_i = 168;
-                } else {
-                    if ($new_i == 1105) {
-                        $out_i = 184;
-                    } else {
-                        $out_i = $new_i - 848;
-                    }
-                }
-                // UKRAINIAN fix
-                switch ($out_i){
-                    case 262: $out_i=179;break;// пїЅ
-                    case 182: $out_i=178;break;// пїЅ
-                    case 260: $out_i=186;break;// пїЅ
-                    case 180: $out_i=170;break;// пїЅ
-                    case 263: $out_i=191;break;// пїЅ
-                    case 183: $out_i=175;break;// пїЅ
-                    case 321: $out_i=180;break;// пїЅ
-                    case 320: $out_i=165;break;// пїЅ
-                }
-                $out .= chr($out_i);
-                
-                $byte2 = false;
-            }
-            if ( ( $i >> 5) == 6) {
-                $c1 = $i;
-                $byte2 = true;
+        // Go thru multipart sections
+        if (isset($struct->parts) && is_array($struct->parts)) 
+        {
+            foreach ($struct->parts as $part) 
+            {
+                self::setup_attachments($email, $part);
             }
         }
-        return $out;
     }
 }
 ?>

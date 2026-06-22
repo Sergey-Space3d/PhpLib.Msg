@@ -6,59 +6,31 @@ class Email extends QueueMessage
 {
 	const BR = '<br/>';
 	const CRLF = "\r\n";
-
+	
+	/** Test address */
+	public static $TestTo = null;
+	
+	/** Enable/disable sending msgs */
+	public static $Disabled = false;
+	
+	/** Email headers */
+	public $Header = null;
+	
 	protected $mail_server = null;
 	protected $msg_uid = null;
-    protected $from_name = null;
-    protected $cc = array();
+
     protected $sender_ip = null;
     protected $sender_domain = null;
-    
-    /** Test address */
-    public static $TestTo =null;
-    
-    /** Enable/disable sending msgs */
-    public static $Disabled = false;
     
 	/** The constructor */
 	public function __construct($subject=null, $from=null, $from_name=null, $to=null, $to_name=null)
 	{
 	    parent::__construct(MsgDb::get_name().'.mail_queue');
 	    
-	    $this->subject = $subject;
-		$this->from = $from;
-		$this->from_name = $from_name;
-		$this->add_to($to, $to_name);
-	}
-	
-	/** Returns true if the record is valid */
-	public function verify() 
-	{
-	    return $this->validate($this->from) && $this->to;
-	}
-	
-	/** Validate email address */
-	public function validate($address)
-	{
-	    $address = trim(strtolower($address));
-	    $n_chars = strlen($address);
-	    
-	    if ($n_chars < 6 || // consider minimum 6 characters (a@b.tv)
-	        ctype_alpha($address[0]) == false || // first char to be alpha
-	        ctype_alnum($address[$n_chars - 1]) == false) // last char to be alphanum
-	    {
-	        return false;
-	    }
-	    
-	    // Check the pattern
-	    $regex = '/^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,})$/i';
-	    
-	    if (preg_match($regex, $address) == false)
-	    {
-	        return false;
-	    }
-	    
-	    return true;
+	    $this->Header = new EmailHeader();
+	    if ($subject) $this->set_subject($subject);
+	    if ($from) $this->set_from($from, $from_name);
+	    if ($to) $this->set_to($to, $to_name);
 	}
 	
 	public function get_mail_server() { return $this->mail_server; }
@@ -66,12 +38,152 @@ class Email extends QueueMessage
 	
 	public function get_msg_uid() { return $this->msg_uid; }
 	public function set_msg_uid($val) { $this->msg_uid = $val; }
-
-	public function get_from_name() { return $this->from_name; }
-	public function set_from_name($val) { $this->from_name = $val; }
-
-	public function get_cc() { return $this->cc; }
-	public function add_cc($cc, $cc_name=null) { if ($this->validate($cc)) $this->cc[$cc] = $cc_name; }
+	
+	/** Get subject line */
+	public function get_subject() { return $this->Header->get(['SUBJECT']); }
+	
+	/** Set subject line */
+	public function set_subject($val) { $this->Header->set(['SUBJECT'], $val); }
+	
+	// Sender mailboxes -----------------------------------------------------
+	
+	/** Get FROM address (name is optional) */
+	public function get_from(&$name = null) { return $this->get_address('FROM', false, $name); }
+	
+	/** Set FROM address (name is optional). Returns true on success */
+	public function set_from($val, $name = null) { return $this->set_address('FROM', $val, $name); }
+	
+	/** Get REPLY_TO address (name is optional) */
+	public function get_reply_to(&$name = null) { return $this->get_address('REPLY_TO', false, $name); }
+	
+	/** Set REPLY_TO address (name is optional). Returns true on success */
+	public function set_reply_to($val, $name = null) { return $this->set_address('REPLY_TO', $val, $name); }
+	
+	/** Get SENDER address (name is optional) */
+	public function get_sender(&$name = null) { return $this->get_address('SENDER', false, $name); }
+	
+	/** Set SENDER address (name is optional). Returns true on success */
+	public function set_sender($val, $name = null) { return $this->set_address('SENDER', $val, $name); }
+	
+	/** Get RETURN_PATH address (name is optional) */
+	public function get_return_path(&$name = null) { return $this->get_address('RETURN_PATH', false, $name); }
+	
+	/** Set RETURN_PATH address (name is optional). Returns true on success */
+	public function set_return_path($val, $name = null) { return $this->set_address('RETURN_PATH', $val, $name); }
+	
+	// Receiver mailboxes ---------------------------------------------------
+	
+	/** Get TO collection, as [address]=>[name] */
+	public function get_to() { return $this->get_address('TO'); }
+	
+	/** Set TO address (name is optional). Returns true on success */
+	public function set_to($val, $name = null) { return $this->set_address('TO', $val, $name); }
+	
+	/** Add TO address (name is optional). Returns true on success */
+	public function add_to($val, $name = null) { return $this->add_address('TO', $val, $name); }
+	
+	/** Get CC collection, as [address]=>[name] */
+	public function get_cc() { return $this->get_address('CC'); }
+	
+	/** Set CC address (name is optional). Returns true on success */
+	public function set_cc($val, $name = null) { return $this->set_address('CC', $val, $name); }
+	
+	/** Add CC address (name is optional). Returns true on success */
+	public function add_cc($val, $name = null) { return $this->add_address('CC', $val, $name); }
+	
+	/** Get BCC collection, as [address]=>[name] */
+	public function get_bcc() { return $this->get_address('BCC'); }
+	
+	/** Set BCC address (name is optional). Returns true on success */
+	public function set_bcc($val, $name = null) { return $this->set_address('BCC', $val, $name); }
+	
+	/** Add BCC address (name is optional). Returns true on success */
+	public function add_bcc($val, $name = null) { return $this->add_address('BCC', $val, $name); }
+	
+	// Header processing ----------------------------------------------------
+	
+	/** Get mailing address from header */
+	protected function get_address($node, $return_array = true, &$name = null)
+	{
+	    $arr = $this->Header->get([$node]);
+	    
+	    if (is_array($arr))
+	    {
+	        $ret = array();
+	        
+	        foreach ($arr as $el)
+	        {
+	            if (!is_array($el)) continue;
+	            $mailbox = $el['MAILBOX'];
+	            $host = $el['HOST'];
+	            $_name = $el['PERSONAL'];
+	            
+	            if ($mailbox && $host)
+	            {
+	                $addr = "{$mailbox}@{$host}";
+	                
+	                if ($return_array)
+	                {
+	                    // Add address to collection
+	                    $ret[$addr] = $_name;
+	                }
+	                else
+	                {
+	                    // Return first address
+	                    if ($name !== null) $name = $_name;
+	                    return $addr;
+	                }
+	            }
+	        }
+	        
+	        return $ret;
+	    }
+	    
+	    return null;
+	}
+	
+	/** Set mailing address to header */
+	protected function set_address($node, $val, $name)
+	{
+	    // Reset the mailbox
+	    $this->Header->set("{$node}ADDRESS", '');
+	    $this->Header->set([$node], array());
+	    
+	    return $this->add_address($node, $val, $name);
+	}
+	
+	/** Set mailing address to header */
+	protected function add_address($node, $val, $name)
+	{
+	    if (!is_array($val)) $val = array($val=>$name);
+	    $set_node = true;
+	    $addrs = array();
+	    
+	    foreach ($val as $addr=>$_name)
+	    {
+	        if ($this->validate($addr))
+	        {
+	            if ($set_node)
+	            {
+	                // Set the address node once
+	                $set_node = false;
+	                $this->Header->set("{$node}ADDRESS", self::normalize_header_address($addr, $_name));
+	            }
+	            
+	            $arr = explode('@', $addr);
+	            $arr = array('MAILBOX'=>$arr[0], 'HOST'=>$arr[1]);
+	            if ($_name) $arr = array('PERSONAL'=>$_name) + $arr;
+	            $addrs[] = $arr;
+	        }
+	    }
+	    
+	    if (!$addrs) return false;
+	    
+	    $this->Header->set([$node], $addrs);
+	    return true;
+	}
+	
+	// Sender IPs & Domains -------------------------------------------------
 	
 	public function get_sender_domain() { return $this->sender_domain; }
 	public function set_sender_domain($val) { $this->sender_domain = $val; }
@@ -79,18 +191,58 @@ class Email extends QueueMessage
 	public function get_sender_ip() { return $this->sender_ip; }
 	public function set_sender_ip($val) { $this->sender_ip = $val; }
 	
-	public function get_sender_ip_group() 
-	{ 
-        $ip_group = null;
-	   
-        if ($this->sender_ip)
-        {
-            $arr = explode('.', $this->sender_ip);
-            $ip_group = "{$arr[0]}.{$arr[1]}.{$arr[2]}";
-        }
-        
-        return $ip_group; 
+	public function get_sender_ip_group()
+	{
+	    $ip_group = null;
+	    
+	    if ($this->sender_ip)
+	    {
+	        $arr = explode('.', $this->sender_ip);
+	        $ip_group = "{$arr[0]}.{$arr[1]}.{$arr[2]}";
+	    }
+	    
+	    return $ip_group;
 	}
+	
+	// Validation -----------------------------------------------------------
+	
+	/** Returns true if the record is valid */
+	public function verify() 
+	{
+	    return $this->validate($this->get_from()) && $this->validate($this->get_to());
+	}
+	
+	/** Validate email address */
+	public function validate($address)
+	{
+	    if (!$address) return false;
+	    $addresses = is_array($address) ? $address : array($address);
+	    
+	    foreach ($addresses as $address)
+	    {
+    	    $address = trim(strtolower($address));
+    	    $n_chars = strlen($address);
+    	    
+    	    if ($n_chars < 6 || // consider minimum 6 characters (a@b.tv)
+    	        ctype_alpha($address[0]) == false || // first char to be alpha
+    	        ctype_alnum($address[$n_chars - 1]) == false) // last char to be alphanum
+    	    {
+    	        return false;
+    	    }
+    	    
+    	    // Check the pattern
+    	    $regex = '/^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,})$/i';
+    	    
+    	    if (preg_match($regex, $address) == false)
+    	    {
+    	        return false;
+    	    }
+	    }
+	    
+	    return true;
+	}
+	
+	// Composing/sending email ----------------------------------------------
 	
 	/** Append original email */
 	public function append_original_email(Email $email)
@@ -103,10 +255,10 @@ class Email extends QueueMessage
 	        
 	        $this->add_newline();
 	        $this->add_newline();
-	        $this->add_content('----- Original Message -----');
-	        $this->add_content($content);
+	        $this->add_line('----- Original Message -----');
+	        $this->add_line($content);
 	        $this->add_newline();
-	        $this->add_content('-----------');
+	        $this->add_line('-----------');
 	    }
 	}
 	
@@ -123,7 +275,7 @@ class Email extends QueueMessage
 	    $arr['name'] = $name;
 	    $arr['cid'] = $cur_cid;
 	    
-	    $this->attached[] = $arr;
+	    $this->attachments[] = $arr;
 	    return $cur_cid;
 	}
 	
@@ -151,17 +303,23 @@ class Email extends QueueMessage
 	{
 	    if (self::$Disabled) return true;
 	    
-	    if ($this->validate($this->from) && $this->to) 
+	    if ($this->validate($this->get_from()) && $this->validate($this->get_to()))
 	    {
 	        // Make addresses and subject
 	        
-	        $from = self::normalize_header_address($this->from, $this->from_name);
-	        $cc = self::normalize_header_addresses($this->cc);
-	        $to = self::$TestTo ? array(self::$TestTo=>'Test') : $this->to;
+	        $from_name = '';
+	        $from = $this->get_from($from_name);
+	        $from = self::normalize_header_address($from, $from_name);
+	        
+	        $cc = self::normalize_header_addresses($this->get_cc());
+	        
+	        $to_name = ''; // TODO
+	        $to = self::$TestTo ? array(self::$TestTo=>'Test') : $this->get_to($to_name);
 	        $to = self::normalize_header_addresses($to);
 	        
-	        $subject = $this->subject ? $this->subject : 'No subject';
-	        if (self::$TestTo) $subject .= ' ['.self::normalize_header_addresses($this->to).']';
+	        $subject = $this->get_subject();
+	        if (!$subject) $subject = 'No subject';
+	        if (self::$TestTo) $subject .= ' ['.self::normalize_header_addresses($this->get_to($to_name)).']';
 	        
 	        // Compose header
 	        
@@ -171,7 +329,7 @@ class Email extends QueueMessage
 	        $headers = array();
     		$headers[] = "MIME-Version: 1.0";
     		
-    		if ($this->attached)
+    		if ($this->attachments)
     		{
     		    $headers[] = "Content-type: multipart/related;";
     		    $headers[] = "  boundary={$boundary};";
@@ -197,7 +355,7 @@ class Email extends QueueMessage
     		
     		$content = '';
     		
-    		if ($this->attached)
+    		if ($this->attachments)
     		{
     		    $content = array();
     		    $content[] = "--{$boundary}";
@@ -205,7 +363,7 @@ class Email extends QueueMessage
     		    $content[] = "Content-Transfer-Encoding: 7-bit".Email::CRLF;
     		    $content[] = implode(Email::BR, $this->content).Email::CRLF;
     		    
-    		    foreach ($this->attached as $attached)
+    		    foreach ($this->attachments as $attached)
     		    {
     		        $content[] = "--{$boundary}";
     		        $content[] = "Content-Type: {$attached['type']}";
