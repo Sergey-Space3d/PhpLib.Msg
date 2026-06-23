@@ -16,11 +16,17 @@ class Email extends QueueMessage
 	/** Email headers */
 	public $Header = null;
 	
+	/** Collection of attachment filenames */
+	public $Filenames = array();
+	
+	/** Collection of sender domains, as [domain]=>[IP] */
+	public $SenderDomains = array();
+	
+	/** Collection of sender IP groups */
+	public $SenderIpGroups = array();
+	
 	protected $mail_server = null;
 	protected $msg_uid = null;
-
-    protected $sender_ip = null;
-    protected $sender_domain = null;
     
 	/** The constructor */
 	public function __construct($subject=null, $from=null, $from_name=null, $to=null, $to_name=null)
@@ -183,27 +189,6 @@ class Email extends QueueMessage
 	    return true;
 	}
 	
-	// Sender IPs & Domains -------------------------------------------------
-	
-	public function get_sender_domain() { return $this->sender_domain; }
-	public function set_sender_domain($val) { $this->sender_domain = $val; }
-	
-	public function get_sender_ip() { return $this->sender_ip; }
-	public function set_sender_ip($val) { $this->sender_ip = $val; }
-	
-	public function get_sender_ip_group()
-	{
-	    $ip_group = null;
-	    
-	    if ($this->sender_ip)
-	    {
-	        $arr = explode('.', $this->sender_ip);
-	        $ip_group = "{$arr[0]}.{$arr[1]}.{$arr[2]}";
-	    }
-	    
-	    return $ip_group;
-	}
-	
 	// Validation -----------------------------------------------------------
 	
 	/** Returns true if the record is valid */
@@ -282,20 +267,8 @@ class Email extends QueueMessage
 	/** Normalize header address (RFC 2822) */
 	protected static function normalize_header_address($address, $name)
 	{
+	    if (!$address) return null;
 	    return $name ? "{$name} <{$address}>" : $address;
-	}
-
-	/** Normalize header addresses (RFC 2822) */
-	protected static function normalize_header_addresses(array $addresses)
-	{
-	    $arr = array();
-	    
-	    foreach ($addresses as $address=>$name)
-	    {
-	        $arr[] = self::normalize_header_address($address, $name);
-	    }
-	    
-	    return implode(', ', $arr);
 	}
 
 	/** Send the message */
@@ -305,21 +278,43 @@ class Email extends QueueMessage
 	    
 	    if ($this->validate($this->get_from()) && $this->validate($this->get_to()))
 	    {
+	        // Normalize header addresses (RFC 2822)
+	        $normalize_header_addresses = function(array $addresses)
+	        {
+	            $arr = array();
+	            foreach ($addresses as $address=>$name)
+	            {
+	                $arr[] = self::normalize_header_address($address, $name);
+	            }
+	            return implode(', ', $arr);
+	        };
+	        
 	        // Make addresses and subject
 	        
-	        $from_name = '';
-	        $from = $this->get_from($from_name);
-	        $from = self::normalize_header_address($from, $from_name);
+	        $_name = '';
+	        $from = $this->get_from($_name);
+	        $from = self::normalize_header_address($from, $_name);
 	        
-	        $cc = self::normalize_header_addresses($this->get_cc());
+	        $reply_to = $this->get_reply_to($_name);
+	        $reply_to = self::normalize_header_address($reply_to, $_name);
+	        if (!$reply_to) $reply_to = $from;
 	        
-	        $to_name = ''; // TODO
-	        $to = self::$TestTo ? array(self::$TestTo=>'Test') : $this->get_to($to_name);
-	        $to = self::normalize_header_addresses($to);
+	        $return_path = $this->get_return_path($_name);
+	        $return_path = self::normalize_header_address($return_path, $_name);
+	        if (!$return_path) $return_path = $from;
+	        
+	        $sender = $this->get_sender($_name);
+	        $sender = self::normalize_header_address($sender, $_name);
+	        
+	        $to = self::$TestTo ? array(self::$TestTo=>'Test') : $this->get_to();
+	        $to = $normalize_header_addresses($to);
+	        
+	        $cc = $normalize_header_addresses($this->get_cc());
+	        $bcc = $normalize_header_addresses($this->get_bcc());
 	        
 	        $subject = $this->get_subject();
 	        if (!$subject) $subject = 'No subject';
-	        if (self::$TestTo) $subject .= ' ['.self::normalize_header_addresses($this->get_to($to_name)).']';
+	        if (self::$TestTo) $subject .= " [{$to}]";
 	        
 	        // Compose header
 	        
@@ -345,9 +340,12 @@ class Email extends QueueMessage
     		$headers[] = "X-Mailer: PHP/".phpversion();
     		
     		$headers[] = "From: {$from}";
-    		$headers[] = "Reply-to: {$from}";
-    		$headers[] = "Return-Path: {$from}";
-    		$headers[] = "Cc: {$cc}";
+    		$headers[] = "Reply-to: {$reply_to}";
+    		$headers[] = "Return-Path: {$return_path}";
+    		if ($sender) $headers[] = "Sender: {$sender}";
+    		if ($to) $headers[] = "To: {$to}";
+    		if ($cc) $headers[] = "Cc: {$cc}";
+    		if ($bcc) $headers[] = "Bcc: {$bcc}";
     		
     		$headers = implode(Email::CRLF, $headers).Email::CRLF;
     		

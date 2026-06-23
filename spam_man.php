@@ -15,7 +15,7 @@ class SpamMan extends CDbRecordManSingleton
     public function find_spam(Email $email, &$mark_count) 
     {
         $mark_count = 0;
-        $spams = $this->get();
+        $spams = $this->get('_type ASC');
         
         if ($spams) foreach ($spams as $spam)
         {
@@ -25,15 +25,15 @@ class SpamMan extends CDbRecordManSingleton
             switch ($type)
             {
                 case Spam::TYPE_IP:
-                    $value = $email->get_sender_ip();
+                    $value = $email->SenderDomains;
                     break;
                     
                 case Spam::TYPE_IP_GROUP:
-                    $value = $email->get_sender_ip_group();
+                    $value = $email->SenderIpGroups;
                     break;
                     
                 case Spam::TYPE_DOMAIN:
-                    $value = $email->get_sender_domain();
+                    $value = array_unique(array_keys($email->SenderDomains));
                     break;
                     
                 case Spam::TYPE_FROM_ADDRESS:
@@ -49,19 +49,23 @@ class SpamMan extends CDbRecordManSingleton
                     break;
             }
             
-            $match = ($type == Spam::TYPE_TEXT) ? 
-            preg_match($spam->get_value(), $value) : 
-            strtoupper($value) == $spam->get_value();
-            
-            if ($match)
+            $values = is_array($value) ? $value : array($value);
+            foreach ($values as $value)
             {
-                // Update the mark count
-                $mark_count = max($mark_count, $spam->get_mark_count());
+                $match = ($type == Spam::TYPE_TEXT) ?
+                preg_match($spam->get_value(), $value) :
+                strtoupper($value) == $spam->get_value();
                 
-                if ($spam->get_mark_count() >= Spam::COUNT_THRESHOLD)
+                if ($match)
                 {
-                    // The email is a spam
-                    return $spam;
+                    // Update the mark count
+                    $mark_count = max($mark_count, $spam->get_mark_count());
+                    
+                    if ($spam->get_mark_count() >= Spam::COUNT_THRESHOLD)
+                    {
+                        // The email is a spam
+                        return $spam;
+                    }
                 }
             }
         }

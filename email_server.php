@@ -121,7 +121,7 @@ class EmailServer
                         if ($struct)
                         {
                             // Populate attachment list
-                            self::setup_attachments($email, $struct);
+                            self::process_attachments($email, $struct);
                             
                             $body = null;
                             
@@ -217,24 +217,80 @@ class EmailServer
                 return $ip == $domain ? null : $ip;
             };
             
-            if (!$sender || !$sender->host) return false;
+            $ip_group_by_ip = function($ip)
+            {
+                $arr = explode('.', $ip);
+                return "{$arr[0]}.{$arr[1]}.{$arr[2]}";
+            };
             
-            $domain = $domain_by_host($sender->host);
-            if (!$domain) return false;
-            
-            $email->set_sender_domain($domain);
-            
-            $ip = $ip_by_domain($domain);
-            if (!$ip) return false;
-            
-            $email->set_sender_ip($ip);
-            return true;
+            if ($sender && $sender->host)
+            {
+                $domain = $domain_by_host($sender->host);
+                if (!$domain) return;
+                
+                $ip = $ip_by_domain($domain);
+                $email->SenderDomains[strtolower($domain)] = $ip;
+                
+                if ($ip)
+                {
+                    $ip_group = $ip_group_by_ip($ip);
+                    $email->SenderIpGroups[] = $ip_group;
+                }
+            }
         };
         
-        return 
-        $setup($email, is_array($msg->sender) ? array_shift($msg->sender) : $msg->sender) ||
-        $setup($email, is_array($msg->reply_to) ? array_shift($msg->reply_to) : $msg->reply_to) ||
-        $setup($email, is_array($msg->from) ? array_shift($msg->from) : $msg->from);
+        if (is_array($msg->from)) $setup($email, $msg->from[0]);
+        if (is_array($msg->reply_to)) $setup($email, $msg->reply_to[0]);
+        if (is_array($msg->return_path)) $setup($email, $msg->return_path[0]);
+        if (is_array($msg->sender)) $setup($email, $msg->sender[0]);
+        
+        $email->SenderIpGroups = array_unique($email->SenderIpGroups);
+    }
+    
+    /** Collect attachment filenames */
+    static protected function process_attachments(Email $email, $struct)
+    {
+        $normalize = function($str)
+        {
+            $out = '';
+            foreach (@imap_mime_header_decode($str) as $s) $out .= $s->text;
+            return strtolower($out);
+        };
+        
+        if (isset($struct->parameters) && is_array($struct->parameters))
+        {
+            foreach ($struct->parameters as $param)
+            {
+                if (strtoupper($param->attribute) == 'FILENAME' ||
+                    (strtoupper($param->attribute) == 'NAME' && stripos($param->value, '.ics') !== false))
+                {
+                    $email->Filenames[] = $normalize($param->value);
+                }
+            }
+        }
+        
+        if (isset($struct->dparameters) && is_array($struct->dparameters))
+        {
+            foreach ($struct->dparameters as $param)
+            {
+                if (strtoupper($param->attribute) == 'FILENAME')
+                {
+                    $email->Filenames[] = $normalize($param->value);
+                }
+            }
+        }
+        
+        // Go thru multipart sections
+        if (isset($struct->parts) && is_array($struct->parts))
+        {
+            foreach ($struct->parts as $part)
+            {
+                self::process_attachments($email, $part);
+            }
+        }
+        
+        // Remove duplicate names
+        $email->Filenames = array_unique($email->Filenames);
     }
     
     /** Extract essential text from the message's body */
@@ -295,40 +351,6 @@ class EmailServer
         }
         
         return $text;
-    }
-    
-    static protected function setup_attachments(Email $email, $struct)
-    {
-        if (isset($struct->parameters) && is_array($struct->parameters)) 
-        {
-            foreach ($struct->parameters as $param) 
-            {
-                if (strtoupper($param->attribute) == 'FILENAME') 
-                {
-                    $email->add_attachment($param->value);
-                }
-            }
-        }
-        
-        if (isset($struct->dparameters) && is_array($struct->dparameters)) 
-        {
-            foreach ($struct->dparameters as $param) 
-            {
-                if (strtoupper($param->attribute) == 'FILENAME')
-                {
-                    $email->add_attachment($param->value);
-                }
-            }
-        }
-        
-        // Go thru multipart sections
-        if (isset($struct->parts) && is_array($struct->parts)) 
-        {
-            foreach ($struct->parts as $part) 
-            {
-                self::setup_attachments($email, $part);
-            }
-        }
     }
 }
 ?>
