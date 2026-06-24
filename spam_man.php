@@ -5,16 +5,69 @@
 /** Spam Manager Class */
 class SpamMan extends CDbRecordManSingleton
 {
+    protected $Scores = array( 
+    Spam::MULTIPLE_SENDER_DOMAINS =>2,
+    Spam::INVALID_SENDER_DOMAIN_IP=>2,
+    Spam::DATA_FILE_ATTACHED=>3,
+    Spam::CALENDAR_FILE_ATTACHED=>3,
+    );
+    
     /** The constructor */
     protected function __construct()
     {
         parent::__construct(MsgDb::get_name().'.spam', 'Spam');
     }
     
+    /** Find common spam issues */
+    protected function find_common_spam_issues(Email $email, &$mark_count)
+    {
+        $flags = 0;
+        
+        if (count($email->SenderDomains) > 1) 
+        {
+            $flags = Spam::MULTIPLE_SENDER_DOMAINS;
+            $mark_count += $this->Scores[Spam::MULTIPLE_SENDER_DOMAINS];
+        }
+        
+        if (array_search('', $email->SenderDomains))
+        {
+            $flags |= Spam::INVALID_SENDER_DOMAIN_IP;
+            $mark_count += $this->Scores[Spam::INVALID_SENDER_DOMAIN_IP];
+        }
+        
+        if ($email->Filenames)
+        {
+            $files = implode(' ', $email->Filenames);
+            
+            if (stripos($files, '.dat') !== false)
+            {
+                $flags |= Spam::DATA_FILE_ATTACHED;
+                $mark_count += $this->Scores[Spam::DATA_FILE_ATTACHED];
+            }
+            
+            if (stripos($files, '.ics') !== false)
+            {
+                $flags |= Spam::CALENDAR_FILE_ATTACHED;
+                $mark_count += $this->Scores[Spam::CALENDAR_FILE_ATTACHED];
+            }
+        }
+        
+        return $flags;
+    }
+    
     /** Returns Spam instance if the email is a spam, returns null otherwise */
     public function find_spam(Email $email, &$mark_count) 
     {
         $mark_count = 0;
+        $flags = $this->find_common_spam_issues($email, $mark_count);
+        $email->set_flags($flags);
+        
+        if ($mark_count >= Spam::COUNT_THRESHOLD)
+        {
+            // The email is a spam
+            return new Spam();
+        }
+        
         $spams = $this->get('_type ASC');
         
         if ($spams) foreach ($spams as $spam)
@@ -46,7 +99,7 @@ class SpamMan extends CDbRecordManSingleton
                     break;
                     
                 default: // Unknown type
-                    break;
+                    continue 2;
             }
             
             $values = is_array($value) ? $value : array($value);
@@ -59,9 +112,9 @@ class SpamMan extends CDbRecordManSingleton
                 if ($match)
                 {
                     // Update the mark count
-                    $mark_count = max($mark_count, $spam->get_mark_count());
+                    $mark_count += $spam->get_mark_count();
                     
-                    if ($spam->get_mark_count() >= Spam::COUNT_THRESHOLD)
+                    if ($mark_count >= Spam::COUNT_THRESHOLD)
                     {
                         // The email is a spam
                         return $spam;

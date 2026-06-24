@@ -19,7 +19,12 @@ class Spam extends CDbRecord
     
     const COUNT_THRESHOLD = 5;
     const FOLDER = 'Junk';
-
+    
+    const MULTIPLE_SENDER_DOMAINS  = 0x01;
+    const INVALID_SENDER_DOMAIN_IP = 0x02;
+    const DATA_FILE_ATTACHED       = 0x04;
+    const CALENDAR_FILE_ATTACHED   = 0x08;
+    
     /** The constructor */
     public function __construct($id = 0)
     {
