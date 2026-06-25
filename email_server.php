@@ -7,7 +7,7 @@ class EmailServer
     protected $m_port = 993; // 110 for POP3
     protected $m_service = '/imap/ssl'; // '/pop3/notls' for POP3
     protected $m_server = null;
-    protected $m_user = null;
+    protected $m_username = null;
     protected $m_password = null;
     protected $m_imap_stream = null;
     
@@ -15,14 +15,15 @@ class EmailServer
     public function __construct($server, $user, $password)
     {
         $this->m_server = $server;
-        $this->m_user = $user;
+        $this->m_username = $user;
         $this->m_password = $password;
     }
     
     /** Pop the last errors from the queue */
     static public function pop_errors()
     {
-        return @imap_errors();
+        $errors = @imap_errors();
+        return $errors === false ? array() : $errors;
     }
     
     /** Open IMAP stream. Returns true on success */
@@ -31,7 +32,7 @@ class EmailServer
         if ($this->m_imap_stream) $this->close();
         
         $authhost = "{".$this->m_server.":".$this->m_port.$this->m_service."}INBOX";
-        $this->m_imap_stream = @imap_open($authhost, $this->m_user, $this->m_password);
+        $this->m_imap_stream = @imap_open($authhost, $this->m_username, $this->m_password);
         
         return $this->m_imap_stream != null;
     }
@@ -78,7 +79,7 @@ class EmailServer
         
         // Open read-only stream
         $authhost = "{".$this->m_server.":".$this->m_port.$this->m_service."}INBOX";
-        $stream = @imap_open($authhost, $this->m_user, $this->m_password, OP_READONLY);
+        $stream = @imap_open($authhost, $this->m_username, $this->m_password, OP_READONLY);
         
         if ($stream)
         {
