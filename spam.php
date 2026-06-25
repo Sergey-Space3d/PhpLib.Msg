@@ -11,8 +11,8 @@ class Spam extends CDbRecord
     'spam_count'=>'int',
     );
     
-    const TYPE_IP = 1;
     const TYPE_IP_GROUP = 2;
+    const TYPE_IP = 1;
     const TYPE_DOMAIN = 3;
     const TYPE_FROM_ADDRESS = 4;
     const TYPE_TEXT = 5;
