@@ -17,9 +17,9 @@ class AddMailboxForm extends CForm
         $this->add_inner($table);
         
         $attrs = array('style'=>'width:130px;', 'maxlength'=>100, 'autocomplete'=>'off');
-        $ctrl1 = new CHtmlText('server', null, $attrs);
-        $ctrl2 = new CHtmlText('username', null, $attrs);
-        $ctrl3 = new CHtmlText('password', null, $attrs);
+        $ctrl1 = new CHtmlText('server', $server, $attrs);
+        $ctrl2 = new CHtmlText('username', $username, $attrs);
+        $ctrl3 = new CHtmlText('password', $password, $attrs);
         
         $ctrl4 = new CHtmlSubmit('Add Mailbox');
         $ctrl4->disable_on_click();

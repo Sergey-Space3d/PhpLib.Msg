@@ -19,10 +19,18 @@ class AddMailboxController extends CController
         $password = strtolower(trim($this->get_value('password')));
         $filename = $this->get_value('filename');
         
-        if (!$server || !$username || !$password)
+        $validator = new FieldValidator();
+        $validator->MinPassword = 3;
+        $validator->MaxPassword = 120;
+        $validator->PasswordWhitespaceAllowed = true;
+        
+        $is_domain = $validator->is_domain($server);
+        $is_email = $validator->is_email($username);
+        $is_password = $validator->is_password($password);
+        
+        if (!$is_domain || !$is_email || !$is_password)
         {
-            // TODO: validate domain/email
-            CHtmlPage::set_last_error("Invaild input");
+            CHtmlPage::set_last_error($validator->get_errors());
             return false;
         }
         
