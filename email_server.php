@@ -4,19 +4,24 @@
 
 class EmailServer
 {
-    protected $m_port = 993; // 110 for POP3
-    protected $m_service = '/imap/ssl'; // '/pop3/notls' for POP3
     protected $m_server = null;
     protected $m_username = null;
     protected $m_password = null;
+    protected $m_port = null;
+    protected $m_service = null;
+    protected $m_mailbox_id = 0;
+    
     protected $m_imap_stream = null;
     
     /** The constructor */
-    public function __construct($server, $user, $password)
+    public function __construct(Mailbox $mailbox)
     {
-        $this->m_server = $server;
-        $this->m_username = $user;
-        $this->m_password = $password;
+    	$this->m_server = $mailbox->get_mail_server();
+    	$this->m_username = $mailbox->get_username();
+    	$this->m_password = $mailbox->get_password();
+    	$this->m_port = $mailbox->get_port(); // 993 for IMAP, 110 for POP3
+    	$this->m_service = $mailbox->get_service(); // '/imap/ssl' for IMAP, '/pop3/notls' for POP3
+    	$this->m_mailbox_id = $mailbox->get_id();
     }
     
     /** Pop the last errors from the queue */
@@ -101,7 +106,7 @@ class EmailServer
                         $email->Header->read($msg);
                         
                         // Remember the mail server
-                        $email->set_mail_server($this->m_server);
+                        $email->set_mailbox_id($this->m_mailbox_id);
                         
                         // Remember to mailbox sequence number
                         $uid = @imap_uid($stream, $msg_id);

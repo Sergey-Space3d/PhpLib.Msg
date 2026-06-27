@@ -25,7 +25,7 @@ class Email extends QueueMessage
 	/** Collection of sender IP groups */
 	public $SenderIpGroups = array();
 	
-	protected $mail_server = null;
+	protected $mailbox_id = 0;
 	protected $msg_uid = null;
     
 	/** The constructor */
@@ -39,8 +39,8 @@ class Email extends QueueMessage
 	    if ($to) $this->set_to($to, $to_name);
 	}
 	
-	public function get_mail_server() { return $this->mail_server; }
-	public function set_mail_server($val) { $this->mail_server = $val; }
+	public function get_mailbox_id() { return $this->mailbox_id; }
+	public function set_mailbox_id($val) { $this->mailbox_id = (int)$val; }
 	
 	public function get_msg_uid() { return $this->msg_uid; }
 	public function set_msg_uid($val) { $this->msg_uid = $val; }

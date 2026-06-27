@@ -8,23 +8,33 @@ class AddMailboxController extends CController
     /** Initialize the form */
     protected function initialize()
     {
+    	$mail_server = self::get_value('mail_server'); //
+    	$this->set_arg('mail_server', $mail_server);
+    	
+    	$port = self::get_value('port');
+    	$this->set_arg('port', $port ? $port : '993');
+    	
+    	$service = self::get_value('service');
+    	$this->set_arg('service', $service ? $service : '/imap/ssl');
+    	
         $this->enable_post(true);
     }
     
     /** Process the form */
     protected function process()
     {
-        $server = strtolower(trim($this->get_value('server')));
+        $mail_server = strtolower(trim($this->get_value('mail_server')));
         $username = strtolower(trim($this->get_value('username')));
-        $password = strtolower(trim($this->get_value('password')));
-        $filename = $this->get_value('filename');
+        $password = trim($this->get_value('password'));
+        $port = (int)$this->get_value('port');
+        $service = trim($this->get_value('service'));
         
         $validator = new FieldValidator();
         $validator->MinPassword = 3;
-        $validator->MaxPassword = 120;
+        $validator->MaxPassword = 100;
         $validator->PasswordWhitespaceAllowed = true;
         
-        $is_domain = $validator->is_domain($server);
+        $is_domain = $validator->is_domain($mail_server);
         $is_email = $validator->is_email($username);
         $is_password = $validator->is_password($password);
         
@@ -34,33 +44,38 @@ class AddMailboxController extends CController
             return false;
         }
         
-        $mailboxes = SpamMan::Instance()->get_mailboxes($filename);
-        if (!array_key_exists($server, $mailboxes)) $mailboxes[$server] = array();
-        
-        foreach ($mailboxes as $svr=>&$userboxes)
+        if ($port <= 0)
         {
-            if ($svr == $server)
-            {
-                foreach ($userboxes as $un=>$pwd)
-                {
-                    if ($un == $username)
-                    {
-                        CHtmlPage::set_last_error("Mailbox '{$username}' ({$server}) already exists");
-                        return false;
-                    }
-                }
-                
-                // Save mailboxes
-                $userboxes[$username] = $password;
-                SpamMan::Instance()->set_mailboxes($filename, $mailboxes);
-                
-                CHtmlPage::set_last_info("Mailbox '{$username}' ({$server}) was added");
-                return true;
-            }
+        	CHtmlPage::set_last_error("Port Number shall be a positive number");
+        	return false;
         }
         
-        // NOTE: should not reach this point
-        CHtmlPage::set_last_error("Unknown error");
+        if (strlen($service) == 0)
+        {
+        	CHtmlPage::set_last_error("Invalid service string");
+        	return false;
+        }
+        
+        if (MailboxMan::Instance()->has($mail_server, $username))
+        {
+        	CHtmlPage::set_last_error("Mailbox '{$username}' ({$mail_server}) already exists");
+        	return false;
+        }
+        
+        $mailbox = new Mailbox();
+        $mailbox->set_mail_server($mail_server);
+        $mailbox->set_username($username);
+        $mailbox->set_password($password);
+        $mailbox->set_port($port);
+        $mailbox->set_service($service);
+        
+        if ($mailbox->write())
+        {
+        	CHtmlPage::set_last_info("Mailbox '{$username}' ({$mail_server}) was added");
+        	return true;
+        }
+        
+        CHtmlPage::set_last_error("Failed to save mailbox '{$username}' ({$mail_server})");
         return false;
     }
 }

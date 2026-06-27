@@ -14,11 +14,11 @@ class MoveEmailToSpamController extends CController
     /** Process the form */
     protected function process()
     {
+    	$mailbox_id = $this->get_value('mailbox_id');
         $msg_uid = $this->get_value('msg_uid');
         $folder = $this->get_value('folder');
-        $si = unserialize($this->get_value('server_info'));
         
-        $mail_server = new EmailServer($si['server'], $si['mailbox'], $si['password']);
+        $mail_server = new EmailServer(new Mailbox($mailbox_id));
         
         if ($mail_server->open())
         {

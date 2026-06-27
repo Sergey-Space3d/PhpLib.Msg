@@ -23,7 +23,9 @@ $__classes = array(
     'QueueMessage'=>$__dir.'/queue_message.php',
     'SmsContentMan'=>$__dir.'/sms_content_man.php',
     'SmsContent'=>$__dir.'/sms_content.php',
-    'MessageTemplateMan'=>$__sudir.'/message_template_man.php',
+	'MailboxMan'=>$__dir.'/mailbox_man.php',
+	'Mailbox'=>$__dir.'/mailbox.php',
+	'MessageTemplateMan'=>$__sudir.'/message_template_man.php',
     'MessageTemplate'=>$__sudir.'/message_template.php',
     'TemplateMessenger'=>$__sudir.'/template_messenger.php',
 );

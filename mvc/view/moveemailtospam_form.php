@@ -10,9 +10,9 @@ class MoveEmailToSpamForm extends CForm
     {
         @extract($args);
         
+        $this->add_inner(new CHtmlHidden('mailbox_id', $mailbox_id));
         $this->add_inner(new CHtmlHidden('msg_uid', $msg_uid));
         $this->add_inner(new CHtmlHidden('folder', $folder));
-        $this->add_inner(new CHtmlHidden('server_info', $server_info));
         
         $this->set_confirm("Confirm moving email {$msg_uid}");
         

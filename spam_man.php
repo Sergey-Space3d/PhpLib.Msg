@@ -5,9 +5,6 @@
 /** Spam Manager Class */
 class SpamMan extends CDbRecordManSingleton
 {
-    // Collection of spam mailboxes, to be set externally
-    protected $mailboxes = null;
-    
     protected $Scores = array( 
     Spam::MULTIPLE_SENDER_DOMAINS =>2,
     Spam::INVALID_SENDER_DOMAIN_IP=>2,
@@ -19,26 +16,6 @@ class SpamMan extends CDbRecordManSingleton
     protected function __construct()
     {
         parent::__construct(MsgDb::get_name().'.spam', 'Spam');
-    }
-    
-    /** Returns spam mailboxes written to the file. NOTE: the filename has to be supplied only once */
-    public function get_mailboxes($filename = null)
-    {
-        if ($filename)
-        {
-            $data = file_get_contents($filename);
-            $this->mailboxes = unserialize(base64_decode($data));
-        }
-        
-        return $this->mailboxes;
-    }
-    
-    /** Set spam mailboxes (and write it to the file) */
-    public function set_mailboxes($filename, array $mailboxes)
-    {
-        $this->mailboxes = $mailboxes;
-        $data = base64_encode(serialize($mailboxes));
-        return file_put_contents($filename, $data);
     }
     
     /** Find common spam issues */

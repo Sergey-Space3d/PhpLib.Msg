@@ -11,10 +11,7 @@ class DeleteMailboxForm extends CForm
         @extract($args);
         
         $this->set_confirm("Confirm deleting mailbox");
-        
-        $this->add_inner(new CHtmlHidden('server', $server));
-        $this->add_inner(new CHtmlHidden('username', $username));
-        $this->add_inner(new CHtmlHidden('filename', $filename));
+        $this->add_inner(new CHtmlHidden('id', $id));
         
         $ctrl = new CHtmlSubmit('Delete', array('class'=>($class ? $class : 'deck')));
         $ctrl->disable_on_click();
