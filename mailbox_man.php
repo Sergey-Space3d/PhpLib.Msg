@@ -11,10 +11,10 @@ class MailboxMan extends CDbRecordManSingleton
 		parent::__construct(MsgDb::get_name().'.mailboxes', 'Mailbox');
 	}
 	
-	/** Returns true if the user/address is already defined for the mail server */
-	public function has($mail_server, $username)
+	/** Returns true if the user/address already exists */
+	public function has($username)
 	{
-		return $this->m_table->has("mail_server='{$mail_server}' AND username='{$username}'");
+		return $this->m_table->has("username='{$username}'");
 	}
 }
 ?>

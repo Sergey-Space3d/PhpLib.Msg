@@ -56,7 +56,7 @@ class AddMailboxController extends CController
         	return false;
         }
         
-        if (MailboxMan::Instance()->has($mail_server, $username))
+        if (MailboxMan::Instance()->has($username))
         {
         	CHtmlPage::set_last_error("Mailbox '{$username}' ({$mail_server}) already exists");
         	return false;
