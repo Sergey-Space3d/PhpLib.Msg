@@ -13,7 +13,14 @@ class MarkSpamTextForm extends CForm
         $this->add_inner(new CHtmlHidden('is_spam', $is_spam));
         $this->set_confirm($confirm);
         
+        $tip_attrs = array('style'=>'width:350px;');
+        $tip = 'Enter spam text, or regular expression<br/>
+        for ex. /expression here/.<br/>
+        You may use several phrases<br/>
+        by separating them with | character, as in<br/>
+        first|second|third';
         $ctrl = new CHtmlText('value', $value);
+        $ctrl = new Tooltip($ctrl, $tip, $tip_attrs);
         $this->add_inner($ctrl);
         
         $attrs = $btn_width ? array('style'=>"width:{$btn_width}px;") : null;
