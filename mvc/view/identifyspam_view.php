@@ -102,28 +102,28 @@ class IdentifySpamView extends ListView
         
         if ($this->m_ip_groups)
         {
-            $args = array('values'=>$this->m_ip_groups, 'type'=>Spam::TYPE_IP_GROUP, 'is_spam'=>true, 'btn_width'=>$btn_width);
+            $args = array('values'=>$this->m_ip_groups, 'type'=>SpamFilter::TYPE_IP_GROUP, 'is_spam'=>true, 'btn_width'=>$btn_width);
             $form = CDispatcher::instance()->get_form("MarkSpamSender", $args);
             $el->add_inner($form);
         }
         
         if ($this->m_ips)
         {
-            $args = array('values'=>$this->m_ips, 'type'=>Spam::TYPE_IP, 'is_spam'=>true, 'btn_width'=>$btn_width);
+            $args = array('values'=>$this->m_ips, 'type'=>SpamFilter::TYPE_IP, 'is_spam'=>true, 'btn_width'=>$btn_width);
             $form = CDispatcher::instance()->get_form("MarkSpamSender", $args);
             $el->add_inner($form);
         }
         
         if ($this->m_domains)
         {
-            $args = array('values'=>$this->m_domains, 'type'=>Spam::TYPE_DOMAIN, 'is_spam'=>true, 'btn_width'=>$btn_width);
+            $args = array('values'=>$this->m_domains, 'type'=>SpamFilter::TYPE_DOMAIN, 'is_spam'=>true, 'btn_width'=>$btn_width);
             $form = CDispatcher::instance()->get_form("MarkSpamSender", $args);
             $el->add_inner($form);
         }
         
         if ($this->m_addresses)
         {
-            $args = array('values'=>$this->m_addresses, 'type'=>Spam::TYPE_FROM_ADDRESS, 'is_spam'=>true, 'btn_width'=>$btn_width);
+            $args = array('values'=>$this->m_addresses, 'type'=>SpamFilter::TYPE_FROM_ADDRESS, 'is_spam'=>true, 'btn_width'=>$btn_width);
             $form = CDispatcher::instance()->get_form("MarkSpamSender", $args);
             $el->add_inner($form);
         }
@@ -268,16 +268,17 @@ class IdentifySpamView extends ListView
         $to = array_shift($arr);
         
         $mark_count = 0;
-        $spam = SpamMan::Instance()->find_spam($email, $mark_count);
+        $spam = SpamFilterMan::Instance()->find_spam($email, $mark_count);
         
         $flags_to_desc = function($flags, $title, $value = null)
         {
             $desc = array($title);
             if ($value) $desc[] = $value;
-            if ($flags & Spam::MULTIPLE_SENDER_DOMAINS) $desc[] = 'Multiple sender domains';
-            if ($flags & Spam::INVALID_SENDER_DOMAIN_IP) $desc[] = 'Invalid sender domain\'s IP';
-            if ($flags & Spam::DATA_FILE_ATTACHED) $desc[] = 'Data file attached';
-            if ($flags & Spam::CALENDAR_FILE_ATTACHED) $desc[] = 'Calendar file attached';
+            if ($flags & SpamFilter::MULTIPLE_SENDERS) $desc[] = 'Multiple senders';
+            if ($flags & SpamFilter::MULTIPLE_SENDER_DOMAINS) $desc[] = 'Multiple sender domains';
+            if ($flags & SpamFilter::INVALID_SENDER_DOMAIN_IP) $desc[] = 'Invalid sender domain\'s IP';
+            if ($flags & SpamFilter::DATA_FILE_ATTACHED) $desc[] = 'Data file attached';
+            if ($flags & SpamFilter::CALENDAR_FILE_ATTACHED) $desc[] = 'Calendar file attached';
             return implode('<br/>', $desc);
         };
         
@@ -296,7 +297,7 @@ class IdentifySpamView extends ListView
                 if ($ip)
                 {
                     $key = "MarkSpamIp{$ip}";
-                    $args = array('value'=>$ip, 'type'=>Spam::TYPE_IP);
+                    $args = array('value'=>$ip, 'type'=>SpamFilter::TYPE_IP);
                     $forms[$key] = CDispatcher::instance()->get_form("MarkSpamSender", $args);
                     $form_view->add_form($forms[$key]);
                 }
@@ -305,17 +306,17 @@ class IdentifySpamView extends ListView
             foreach ($email->SenderIpGroups as $ip_group)
             {
                 $key = "MarkSpamIpGroup{$ip_group}";
-                $args = array('value'=>$ip_group, 'type'=>Spam::TYPE_IP_GROUP);
+                $args = array('value'=>$ip_group, 'type'=>SpamFilter::TYPE_IP_GROUP);
                 $forms[$key] = CDispatcher::instance()->get_form("MarkSpamSender", $args);
                 $form_view->add_form($forms[$key]);
             }
             
-            $args = array('mailbox_id'=>$email->get_mailbox_id(), 'msg_uid'=>$email->get_msg_uid(), 'folder'=>Spam::FOLDER);
+            $args = array('mailbox_id'=>$email->get_mailbox_id(), 'msg_uid'=>$email->get_msg_uid(), 'folder'=>SpamFilter::FOLDER);
             $forms['MoveEmailToSpam'] = CDispatcher::instance()->get_form("MoveEmailToSpam", $args);
             $form_view->add_form($forms['MoveEmailToSpam']);
             
             $attrs = array('style'=>'margin:5px;padding:10px;font-weight:bold;border:1px solid grey;');
-            $desc = $flags_to_desc($email->get_flags(), "Mark count: {$mark_count} of ".Spam::COUNT_THRESHOLD);
+            $desc = $flags_to_desc($email->get_flags(), "Spam score: {$mark_count} of ".SpamFilter::COUNT_THRESHOLD);
             $el = new CHtmlElement('div', $attrs, $desc);
             $form_view->add_row($el);
         }

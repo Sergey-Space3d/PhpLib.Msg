@@ -10,12 +10,12 @@ class EditSpamView extends ListView
     protected function get_items($obj, &$objs)
     {
         $items = array();
-        $spamFilters = SpamMan::Instance()->get();
+        $spamFilters = SpamFilterMan::Instance()->get();
         
         if ($spamFilters) foreach ($spamFilters as $sf)
         {
-            $score = $sf->get_mark_count();
-            if ($score >= Spam::COUNT_THRESHOLD) $score = CHtmlElement::wrap($score, 'b');
+        	$score = $sf->get_score();
+            if ($score >= SpamFilter::COUNT_THRESHOLD) $score = CHtmlElement::wrap($score, 'b');
             $items[] = array(
                 $sf->get_value(),
                 $this->type_to_string($sf->get_type()),
@@ -33,11 +33,11 @@ class EditSpamView extends ListView
     {
         switch ($type)
         {
-            case Spam::TYPE_IP_GROUP: return 'IP Group';
-            case Spam::TYPE_IP: return 'IP';
-            case Spam::TYPE_DOMAIN: return 'Domain';
-            case Spam::TYPE_FROM_ADDRESS: return 'From Address';
-            case Spam::TYPE_TEXT: return 'Text';
+            case SpamFilter::TYPE_IP_GROUP: return 'IP Group';
+            case SpamFilter::TYPE_IP: return 'IP';
+            case SpamFilter::TYPE_DOMAIN: return 'Domain';
+            case SpamFilter::TYPE_FROM_ADDRESS: return 'From Address';
+            case SpamFilter::TYPE_TEXT: return 'Text';
             default: return 'Unknown';
         }
     }
@@ -69,12 +69,12 @@ class EditSpamView extends ListView
     }
     
     /** Make button's deck */
-    protected function make_button_deck(Spam $spam, $horizontal)
+    protected function make_button_deck(SpamFilter $spam_filter, $horizontal)
     {
         $form_view = new FormView($horizontal, array('style'=>'float:right;'));
         $forms = array();
         
-        $form = CDispatcher::instance()->get_form("DeleteSpamFilter", array('id'=>$spam->get_id()));
+        $form = CDispatcher::instance()->get_form("DeleteSpamFilter", array('id'=>$spam_filter->get_id()));
         $form_view->add_form($form);
         
         return $form_view;

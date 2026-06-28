@@ -10,8 +10,8 @@ class MarkSpamTextController extends CController
     {
         $is_spam = $this->get_arg('is_spam');
         
-        $confirm = $is_spam ? "Confirm setting text as spam" : "Confirm marking text";
-        $submit = $is_spam ? "Set Text as Spam" : "Mark Text";
+        $confirm = $is_spam ? "Confirm setting text as spam" : "Confirm scoring up text";
+        $submit = $is_spam ? "Set Text as Spam" : "Score up Text";
         
         $this->set_arg('confirm', $confirm);
         $this->set_arg('submit', $submit);
@@ -40,11 +40,11 @@ class MarkSpamTextController extends CController
                 $el = trim($el);
                 $el = implode('.*?', explode(' ', $el));
             }
-            $value = implode('|', $arr);
-            $value = "/{$value}/i";
+            $value = implode('|\\b', $arr);
+            $value = "/\\b{$value}/i";
         }
         
-        SpamMan::Instance()->mark_spam($value, Spam::TYPE_TEXT, $is_spam);
+        SpamFilterMan::Instance()->mark_spam($value, SpamFilter::TYPE_TEXT, $is_spam);
         
         $str = $is_spam ? "'{$value}' text was set as spam" : "'{$value}' text was marked";
         CHtmlPage::set_last_info($str);

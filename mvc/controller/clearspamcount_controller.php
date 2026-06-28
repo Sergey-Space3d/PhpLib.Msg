@@ -14,7 +14,7 @@ class ClearSpamCountController extends CController
     /** Process the form */
     protected function process()
     {
-        $spam_filters = SpamMan::Instance()->get();
+    	$spam_filters = SpamFilterMan::Instance()->get();
         
         if ($spam_filters)
         {

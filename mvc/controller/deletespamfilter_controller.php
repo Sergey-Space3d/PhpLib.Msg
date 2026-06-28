@@ -15,9 +15,9 @@ class DeleteSpamFilterController extends CController
     protected function process()
     {
         $id = (int)$this->get_value('id');
-        $spam_filter = new Spam($id);
+        $spam_filter = new SpamFilter($id);
 
-        if (SpamMan::Instance()->delete($id))
+        if (SpamFilterMan::Instance()->delete($id))
         {
             CHtmlPage::set_last_info("Spam Filter '{$spam_filter->get_value()}' was deleted");
             return true;

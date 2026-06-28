@@ -15,11 +15,11 @@ class MarkSpamSenderController extends CController
         $subject = self::type_to_string((int)$this->get_arg('type'));
         
         $confirm = $select ?
-        ($is_spam ? "Confirm setting {$subject} as spam" : "Confirm marking {$subject}") :
-        ($is_spam ? "Confirm setting {$subject} {$value} as spam" : "Confirm marking {$subject} {$value}");
+        ($is_spam ? "Confirm setting {$subject} as spam" : "Confirm scoring up {$subject}") :
+        ($is_spam ? "Confirm setting {$subject} {$value} as spam" : "Confirm scoring up {$subject} {$value}");
         $submit = $select ?
-        ($is_spam ? "Set {$subject} as Spam" : "Mark {$subject}") :
-        ($is_spam ? "Set {$subject} {$value} as Spam" : "Mark {$subject} {$value}");
+        ($is_spam ? "Set {$subject} as Spam" : "Score up {$subject}") :
+        ($is_spam ? "Set {$subject} {$value} as Spam" : "Score up {$subject} {$value}");
         
         $this->set_arg('confirm', $confirm);
         $this->set_arg('submit', $submit);
@@ -40,7 +40,7 @@ class MarkSpamSenderController extends CController
             return false;
         }
         
-        SpamMan::Instance()->mark_spam($value, $type, $is_spam);
+        SpamFilterMan::Instance()->mark_spam($value, $type, $is_spam);
         
         $subject = self::type_to_string($type);
         $str = $is_spam ? "{$subject} {$value} was set as spam" : "{$subject} {$value} was marked";
@@ -55,10 +55,10 @@ class MarkSpamSenderController extends CController
         
         switch ($type)
         {
-            case Spam::TYPE_IP: $subject = 'IP'; break;
-            case Spam::TYPE_IP_GROUP: $subject = 'IP Group'; break;
-            case Spam::TYPE_DOMAIN: $subject = 'Domain'; break;
-            case Spam::TYPE_FROM_ADDRESS: $subject = 'Address'; break;
+            case SpamFilter::TYPE_IP: $subject = 'IP'; break;
+            case SpamFilter::TYPE_IP_GROUP: $subject = 'IP Group'; break;
+            case SpamFilter::TYPE_DOMAIN: $subject = 'Domain'; break;
+            case SpamFilter::TYPE_FROM_ADDRESS: $subject = 'Address'; break;
             default: break;
         }
         
