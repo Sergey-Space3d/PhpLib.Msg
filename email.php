@@ -142,7 +142,7 @@ class Email extends QueueMessage
 	            }
 	        }
 	        
-	        return $ret;
+	        return $return_array ? $ret : null;
 	    }
 	    
 	    return null;
@@ -218,7 +218,7 @@ class Email extends QueueMessage
     	    // Check the pattern
     	    $regex = '/^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,})$/i';
     	    
-    	    if (preg_match($regex, $address) == false)
+    	    if (@preg_match($regex, $address) == false)
     	    {
     	        return false;
     	    }

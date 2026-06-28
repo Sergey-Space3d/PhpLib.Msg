@@ -121,7 +121,7 @@ class SpamFilterMan extends CDbRecordManSingleton
             foreach ($values as $value)
             {
                 $match = ($type == SpamFilter::TYPE_TEXT) ?
-                preg_match($sf->get_value(), $value) :
+                @preg_match($sf->get_value(), $value) :
                 strtoupper($value) == $sf->get_value();
                 
                 if ($match)

@@ -323,7 +323,7 @@ class EmailServer
         $text = trim($text);
         
         $matches = array(); // try extracting <body> element
-        if (preg_match('/(?:<body[^>]*>)(.*)<\/body>/isU', $text, $matches)) 
+        if (@preg_match('/(?:<body[^>]*>)(.*)<\/body>/isU', $text, $matches)) 
         {
             $text = $matches[1];
         }
