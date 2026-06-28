@@ -1,4 +1,7 @@
 <?php
+// Copyright 2005-2026 Sergey Shustov.
+// License: GPL v2.  See License.txt.
+
 define('SELECTOR_NOTIFICATION_ID', 'sel_id_notification');
 
 class MsgDb
