@@ -40,8 +40,8 @@ class MarkSpamTextController extends CController
                 $el = trim($el);
                 $el = implode('.*?', explode(' ', $el));
             }
-            $value = implode('|\\b', $arr);
-            $value = "/\\b{$value}/i";
+            $value = implode('|\b', $arr);
+            $value = "/\b{$value}/i";
         }
         
         SpamFilterMan::Instance()->mark_spam($value, SpamFilter::TYPE_TEXT, $is_spam);
