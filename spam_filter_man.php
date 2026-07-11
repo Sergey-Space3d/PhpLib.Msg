@@ -109,7 +109,20 @@ class SpamFilterMan extends CDbRecordManSingleton
                     break;
                     
                 case SpamFilter::TYPE_TEXT:
-                    $value = implode(' ', $email->get_content())." {$email->get_subject()}";
+                	$arr = $email->get_content();
+                	$arr[] = $email->get_subject();
+                	
+                	$name = '';
+                	$email->get_from($name);
+                	$arr[] = $name;
+                	$email->get_reply_to($name);
+                	$arr[] = $name;
+                	$email->get_return_path($name);
+                	$arr[] = $name;
+                	$email->get_sender($name);
+                	$arr[] = $name;
+                	
+                	$value = implode(' ', $arr);
                     $value = str_replace(array("\n", "\t", "<br/>"), ' ', $value);
                     break;
                     

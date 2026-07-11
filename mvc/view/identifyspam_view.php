@@ -26,7 +26,7 @@ class IdentifySpamView extends ListView
         foreach ($mailboxes as $mailbox)
         {
         	$mail_server = new EmailServer($mailbox);
-        	$this->m_emails += array_reverse($mail_server->read($filter, $max_len));
+        	$this->m_emails = array_merge($this->m_emails, array_reverse($mail_server->read($filter, $max_len)));
         }
         
         foreach ($this->m_emails as $email) 
