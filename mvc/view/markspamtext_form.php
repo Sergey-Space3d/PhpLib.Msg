@@ -19,7 +19,7 @@ class MarkSpamTextForm extends CForm
         You may use several phrases<br/>
         by separating them with | character, as in<br/>
         first|second|third';
-        $ctrl = new CHtmlText('value', $value);
+        $ctrl = new CHtmlText('value', $value, array('style'=>'width:400px;', 'maxlength'=>200, 'autocomplete'=>'off'));
         $ctrl = new Tooltip($ctrl, $tip, $tip_attrs);
         $this->add_inner($ctrl);
         

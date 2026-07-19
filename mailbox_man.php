@@ -8,7 +8,7 @@ class MailboxMan extends CDbRecordManSingleton
 	/** The constructor */
 	protected function __construct()
 	{
-		parent::__construct(MsgDb::get_name().'.mailboxes', 'Mailbox');
+		parent::__construct(MsgDb::get_name().'.mailboxes', 'Mailbox', null, 'mail_server ASC, username ASC');
 	}
 	
 	/** Returns true if the user/address already exists */

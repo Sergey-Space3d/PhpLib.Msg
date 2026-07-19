@@ -13,15 +13,19 @@ class IdentifySpamView extends ListView
     protected $m_domains = array();
     protected $m_addresses = array();
     
-    protected $m_use_headers = false;
+    protected $m_show_headers = false;
     
     /** Initialize view contents */
     protected function init_contents(array $args)
     {
         $filter = 'UNSEEN';
         $max_len = 2000;
+        Mailbox::label(new CDbLabel('Mailbox', 'Mailboxes'));
         
-        $mailboxes = MailboxMan::Instance()->get('mail_server ASC, username ASC');
+        $this->m_show_headers = (bool)CHtmlForm::get_value(SHOW_MAILBOX_HEADERS);
+        
+        $id = (int)CHtmlForm::get_value(SELECTOR_MAILBOX_ID);
+        $mailboxes = $id ? array(new Mailbox($id)) : MailboxMan::Instance()->get();
         
         foreach ($mailboxes as $mailbox)
         {
@@ -97,42 +101,46 @@ class IdentifySpamView extends ListView
     {
         $items = array();
         
-        $el = new CHtmlElement('div', array('style'=>'text-align:right;'));
-        $items[] = $el;
+        $attrs = array('style'=>'text-align:right;float:right;');
+        $table = new CHtmlTable($attrs);
+        $items[] = $table;
         
-        $btn_width = 220;
+        $div = new CHtmlElement('div');
+        $attrs = array('colspan'=>'100%', 'style'=>'background-color:#99CCCC;padding:6px 100px 6px 50px;');
+        $table->add_row($div, $attrs);
+        
+        $sel_form = CDispatcher::instance()->get_form("MailboxSelector", null, array('style'=>'float:left;'));
+        $div->add_inner($sel_form);
+        $args = array('show_headers'=>$this->m_show_headers);
+        $headers_form = CDispatcher::instance()->get_form("ShowHeaders", $args, array('style'=>'float:right;'));
+        $div->add_inner($headers_form);
+        
+        $btn_width = 170;
         
         if ($this->m_ip_groups)
         {
-            $args = array('values'=>$this->m_ip_groups, 'type'=>SpamFilter::TYPE_IP_GROUP, 'is_spam'=>true, 'btn_width'=>$btn_width);
-            $form = CDispatcher::instance()->get_form("MarkSpamSender", $args);
-            $el->add_inner($form);
-        }
-        
-        if ($this->m_ips)
-        {
+        	$table->add_row('', array('colspan'=>'100%', 'height'=>'7px'));
+        	
+        	$attrs = array('style'=>'text-align:right;float:right;');
+        	$args = array('values'=>$this->m_ip_groups, 'type'=>SpamFilter::TYPE_IP_GROUP, 'is_spam'=>true, 'btn_width'=>$btn_width);
+            $ipgroup_form = CDispatcher::instance()->get_form("MarkSpamSender", $args, $attrs);
+            
             $args = array('values'=>$this->m_ips, 'type'=>SpamFilter::TYPE_IP, 'is_spam'=>true, 'btn_width'=>$btn_width);
-            $form = CDispatcher::instance()->get_form("MarkSpamSender", $args);
-            $el->add_inner($form);
-        }
-        
-        if ($this->m_domains)
-        {
+            $ip_form = CDispatcher::instance()->get_form("MarkSpamSender", $args, $attrs);
+            
             $args = array('values'=>$this->m_domains, 'type'=>SpamFilter::TYPE_DOMAIN, 'is_spam'=>true, 'btn_width'=>$btn_width);
-            $form = CDispatcher::instance()->get_form("MarkSpamSender", $args);
-            $el->add_inner($form);
-        }
-        
-        if ($this->m_addresses)
-        {
+            $domain_form = CDispatcher::instance()->get_form("MarkSpamSender", $args, $attrs);
+            
             $args = array('values'=>$this->m_addresses, 'type'=>SpamFilter::TYPE_FROM_ADDRESS, 'is_spam'=>true, 'btn_width'=>$btn_width);
-            $form = CDispatcher::instance()->get_form("MarkSpamSender", $args);
-            $el->add_inner($form);
+            $address_form = CDispatcher::instance()->get_form("MarkSpamSender", $args, $attrs);
+            
+            $table->add_row(array($ipgroup_form, $domain_form));
+            $table->add_row(array($ip_form, $address_form));
         }
         
         $args = array('is_spam'=>true, 'btn_width'=>$btn_width);
         $form = CDispatcher::instance()->get_form("MarkSpamText", $args);
-        $el->add_inner($form);
+        $table->add_row($form, array('colspan'=>'100%'));
         
         return $items;
     }
@@ -170,7 +178,7 @@ class IdentifySpamView extends ListView
         $div->add_inner("TO: {$str}<br/>");
         $div->add_inner('<br/>');
         
-        if ($this->m_use_headers)
+        if ($this->m_show_headers)
         {
             $div->add_inner($email->Header);
             $div->add_inner('<br/><br/>');

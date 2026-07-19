@@ -209,12 +209,16 @@ class EmailServer
             $domain_by_host = function($host)
             {
                 if (!$host) return null;
+                
                 $arr = explode('.', $host);
-                
                 $n = count($arr);
-                if ($n < 2) return null;
                 
-                return $arr[$n - 2].'.'.$arr[$n - 1];
+                if ($n < 2) return null;
+                if ($n == 2) return $host;
+                
+                // Consider 2-nd trailing part to be extension if less than 4 char
+                $n = strlen($arr[$n - 2]) < 4 ? 3 : 2;
+                return implode('.', array_slice($arr, -$n));
             };
             
             $ip_by_domain = function($domain)

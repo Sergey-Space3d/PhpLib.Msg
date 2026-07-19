@@ -3,6 +3,8 @@
 // License: GPL v2.  See License.txt.
 
 define('SELECTOR_NOTIFICATION_ID', 'sel_id_notification');
+define('SELECTOR_MAILBOX_ID', 'sel_id_mailbox');
+define('SHOW_MAILBOX_HEADERS', 'show_mailbox_headers');
 
 class MsgDb
 {

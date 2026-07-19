@@ -10,6 +10,10 @@ class MarkSpamSenderForm extends CForm
     {
         @extract($args);
         
+        $table = new CHtmlTable();
+        $this->add_inner($table);
+        $ctrls = [];
+        
         $this->add_inner(new CHtmlHidden('type', $type));
         $this->add_inner(new CHtmlHidden('is_spam', $is_spam));
         
@@ -19,7 +23,7 @@ class MarkSpamSenderForm extends CForm
         {
             $ctrl = new CHtmlCbox('value', $value);
             $ctrl->add_items($values);
-            $this->add_inner($ctrl);
+            $ctrls[] = $ctrl;
         }
         else
         {
@@ -29,7 +33,9 @@ class MarkSpamSenderForm extends CForm
         $attrs = $btn_width ? array('style'=>"width:{$btn_width}px;") : null;
         $ctrl = new CHtmlSubmit($submit, $attrs);
         $ctrl->disable_on_click();
-        $this->add_inner($ctrl);
+        $ctrls[] = $ctrl;
+        
+        $table->add_row($ctrls);
     }
 }
 ?>
