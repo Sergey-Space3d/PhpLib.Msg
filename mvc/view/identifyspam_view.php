@@ -139,7 +139,8 @@ class IdentifySpamView extends ListView
         }
         
         $args = array('is_spam'=>true, 'btn_width'=>$btn_width);
-        $form = CDispatcher::instance()->get_form("MarkSpamText", $args);
+        $attrs = array('style'=>'text-align:right;float:right;');
+        $form = CDispatcher::instance()->get_form("MarkSpamText", $args, $attrs);
         $table->add_row($form, array('colspan'=>'100%'));
         
         return $items;
@@ -302,12 +303,14 @@ class IdentifySpamView extends ListView
         }
         else
         {
+        	$btn_width = 205;
+        	
             foreach (array_unique($email->SenderDomains) as $domain=>$ip)
             {
                 if ($ip)
                 {
                     $key = "MarkSpamIp{$ip}";
-                    $args = array('value'=>$ip, 'type'=>SpamFilter::TYPE_IP);
+                    $args = array('value'=>$ip, 'type'=>SpamFilter::TYPE_IP, 'btn_width'=>$btn_width);
                     $forms[$key] = CDispatcher::instance()->get_form("MarkSpamSender", $args);
                     $form_view->add_form($forms[$key]);
                 }
@@ -316,13 +319,14 @@ class IdentifySpamView extends ListView
             foreach ($email->SenderIpGroups as $ip_group)
             {
                 $key = "MarkSpamIpGroup{$ip_group}";
-                $args = array('value'=>$ip_group, 'type'=>SpamFilter::TYPE_IP_GROUP);
+                $args = array('value'=>$ip_group, 'type'=>SpamFilter::TYPE_IP_GROUP, 'btn_width'=>$btn_width);
                 $forms[$key] = CDispatcher::instance()->get_form("MarkSpamSender", $args);
                 $form_view->add_form($forms[$key]);
             }
             
             $args = array('mailbox_id'=>$email->get_mailbox_id(), 'msg_uid'=>$email->get_msg_uid(), 'folder'=>SpamFilter::FOLDER);
-            $forms['MoveEmailToSpam'] = CDispatcher::instance()->get_form("MoveEmailToSpam", $args);
+            $attrs = array('style'=>'float:right;');
+            $forms['MoveEmailToSpam'] = CDispatcher::instance()->get_form("MoveEmailToSpam", $args, $attrs);
             $form_view->add_form($forms['MoveEmailToSpam']);
             
             $attrs = array('style'=>'margin:5px;padding:10px;font-weight:bold;border:1px solid grey;');

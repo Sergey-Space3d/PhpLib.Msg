@@ -15,13 +15,23 @@ class MarkSpamSenderForm extends CForm
         $ctrls = [];
         
         $this->add_inner(new CHtmlHidden('type', $type));
-        $this->add_inner(new CHtmlHidden('is_spam', $is_spam));
-        
         $this->set_confirm($confirm);
+        
+        if (is_array($scores))
+        {
+        	$ctrl = new CHtmlCbox('score', $score);
+        	$ctrl->add_items($scores);
+        	$ctrls[] = $ctrl;
+        }
+        else
+        {
+        	$this->add_inner(new CHtmlHidden('score', $score));
+        }
         
         if (is_array($values))
         {
-            $ctrl = new CHtmlCbox('value', $value);
+        	$attrs = array('style'=>'min-width:165px;max-width:300px;');
+        	$ctrl = new CHtmlCbox('value', $value, $attrs);
             $ctrl->add_items($values);
             $ctrls[] = $ctrl;
         }

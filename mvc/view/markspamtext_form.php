@@ -10,8 +10,22 @@ class MarkSpamTextForm extends CForm
     {
         @extract($args);
         
-        $this->add_inner(new CHtmlHidden('is_spam', $is_spam));
+        $table = new CHtmlTable();
+        $this->add_inner($table);
+        $ctrls = [];
+        
         $this->set_confirm($confirm);
+        
+        if (is_array($scores))
+        {
+        	$ctrl = new CHtmlCbox('score', $score);
+        	$ctrl->add_items($scores);
+        	$ctrls[] = $ctrl;
+        }
+        else
+        {
+        	$this->add_inner(new CHtmlHidden('score', $score));
+        }
         
         $tip_attrs = array('style'=>'width:350px;');
         $tip = 'Enter spam text, or regular expression<br/>
@@ -21,12 +35,14 @@ class MarkSpamTextForm extends CForm
         first|second|third';
         $ctrl = new CHtmlText('value', $value, array('style'=>'width:400px;', 'maxlength'=>200, 'autocomplete'=>'off'));
         $ctrl = new Tooltip($ctrl, $tip, $tip_attrs);
-        $this->add_inner($ctrl);
+        $ctrls[] = $ctrl;
         
         $attrs = $btn_width ? array('style'=>"width:{$btn_width}px;") : null;
         $ctrl = new CHtmlSubmit($submit, $attrs);
         $ctrl->disable_on_click();
-        $this->add_inner($ctrl);
+        $ctrls[] = $ctrl;
+        
+        $table->add_row($ctrls);
     }
 }
 ?>

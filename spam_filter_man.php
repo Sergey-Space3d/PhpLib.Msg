@@ -16,7 +16,7 @@ class SpamFilterMan extends CDbRecordManSingleton
     /** The constructor */
     protected function __construct()
     {
-        parent::__construct(MsgDb::get_name().'.spam_filters', 'SpamFilter');
+        parent::__construct(MsgDb::get_name().'.spam_filters', 'SpamFilter', null, 'id DESC');
     }
     
     /** Find common spam issues */
@@ -155,7 +155,7 @@ class SpamFilterMan extends CDbRecordManSingleton
     }
     
     /** Mark the value as a spam of curtain type.Returns true if spam */
-    public function mark_spam($value, $type, $is_spam = false) 
+    public function mark_spam($value, $type, $score) 
     {
         $value = trim($value);
         if (!strlen($value)) return false;
@@ -172,10 +172,7 @@ class SpamFilterMan extends CDbRecordManSingleton
             $spam_filter->write();
         }
         
-        // Increase the mark count
-        $count = $is_spam ? SpamFilter::COUNT_THRESHOLD : $spam_filter->get_score() + 1;
-        $spam_filter->set_score($count, true);
-        
+        $spam_filter->set_score($score, true);
         return $count >= SpamFilter::COUNT_THRESHOLD;
     }
 }

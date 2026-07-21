@@ -10,8 +10,18 @@ class MarkSpamTextController extends CController
     {
         $is_spam = $this->get_arg('is_spam');
         
-        $confirm = $is_spam ? "Confirm setting text as spam" : "Confirm scoring up text";
-        $submit = $is_spam ? "Set Text as Spam" : "Score up Text";
+        if (!$is_spam)
+        {
+        	$scores = [];
+        	for ($n = 1; $n <= SpamFilter::COUNT_THRESHOLD; $n++) $scores[$n] = $n;
+        	$this->set_arg('scores', $scores);
+        }
+        
+        $score = $is_spam ? SpamFilter::COUNT_THRESHOLD : 1;
+        $this->set_arg('score', $score);
+        
+        $confirm = $is_spam ? "Confirm setting text as spam" : "Confirm scoring text";
+        $submit = $is_spam ? "Set Text as Spam" : "Score Text";
         
         $this->set_arg('confirm', $confirm);
         $this->set_arg('submit', $submit);
@@ -23,7 +33,7 @@ class MarkSpamTextController extends CController
     protected function process()
     {
         $value = trim($this->get_value('value'));
-        $is_spam = $this->get_value('is_spam');
+        $score = (int)$this->get_value('score');
         
         if (!strlen($value))
         {
@@ -44,9 +54,10 @@ class MarkSpamTextController extends CController
             $value = "/\b{$value}/i";
         }
         
-        SpamFilterMan::Instance()->mark_spam($value, SpamFilter::TYPE_TEXT, $is_spam);
+        SpamFilterMan::Instance()->mark_spam($value, SpamFilter::TYPE_TEXT, $score);
         
-        $str = $is_spam ? "'{$value}' text was set as spam" : "'{$value}' text was marked";
+        $str = $score == SpamFilter::COUNT_THRESHOLD ? 
+        "'{$value}' text was set as spam" : "'{$value}' text was scored {$score}";
         CHtmlPage::set_last_info($str);
         return true;
     }
