@@ -25,6 +25,9 @@ class Email extends QueueMessage
 	/** Collection of sender IP groups */
 	public $SenderIpGroups = array();
 	
+	/** Collection of sender addresses */
+	public $SenderAddresses = array();
+	
 	protected $mailbox_id = 0;
 	protected $msg_uid = null;
     

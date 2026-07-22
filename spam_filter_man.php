@@ -31,13 +31,7 @@ class SpamFilterMan extends CDbRecordManSingleton
         }
         else
         {
-        	$arr = array();
-        	$arr[] = strtolower($email->get_from());
-        	$arr[] = strtolower($email->get_reply_to());
-        	$arr[] = strtolower($email->get_return_path());
-        	$arr[] = strtolower($email->get_sender());
-        	
-        	if (count(array_unique(array_filter($arr))) > 1)
+        	if (count($email->SenderAddresses) > 1)
         	{
 	        	$flags = SpamFilter::MULTIPLE_SENDERS;
 	        	$score += $this->Scores[SpamFilter::MULTIPLE_SENDERS];
@@ -105,7 +99,7 @@ class SpamFilterMan extends CDbRecordManSingleton
                     break;
                     
                 case SpamFilter::TYPE_FROM_ADDRESS:
-                    $value = $email->get_from();
+                    $value = $email->SenderAddresses;
                     break;
                     
                 case SpamFilter::TYPE_TEXT:
