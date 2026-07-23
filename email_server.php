@@ -252,6 +252,11 @@ class EmailServer
 	                $addr = "{$sender->mailbox}@{$sender->host}";
 	                $email->SenderAddresses[] = $addr;
                 }
+                
+                if ($sender->personal)
+                {
+                	$email->SenderNames[] = $sender->personal;
+                }
             }
         };
         
@@ -262,6 +267,7 @@ class EmailServer
         
         $email->SenderIpGroups = array_unique($email->SenderIpGroups);
         $email->SenderAddresses = array_unique($email->SenderAddresses);
+        $email->SenderNames = array_unique($email->SenderNames);
     }
     
     /** Collect attachment filenames */
