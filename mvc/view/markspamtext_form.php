@@ -10,11 +10,34 @@ class MarkSpamTextForm extends CForm
     {
         @extract($args);
         
-        $table = new CHtmlTable();
+        $this->set_confirm($confirm);
+        
+        $attrs = array('align'=>'center', 'style'=>'margin-top:8px;margin-bottom:5px;');
+        $table = new CHtmlTable($attrs);
         $this->add_inner($table);
         $ctrls = [];
         
-        $this->set_confirm($confirm);
+        $tip = 'Use greedy match to allow<br/>any text between words';
+        $ctrl = new CHtmlCheckbox('greedy_match', true, $greedy_match);
+        $ctrls[] = new Tooltip($ctrl, $tip, array('style'=>'width:240px;'));
+        $ctrls[] = 'Greedy match&nbsp;&nbsp;&nbsp;';
+        
+        $tip = 'Case sensitive match';
+        $ctrl = new CHtmlCheckbox('case_sensitive', true, $case_sensitive);
+        $ctrls[] = new Tooltip($ctrl, $tip, array('style'=>'width:220px;'));
+        $ctrls[] = 'Case sensitive&nbsp;&nbsp;&nbsp;';
+        
+        $tip = 'Whole word only match';
+        $ctrl = new CHtmlCheckbox('whole_word', true, $whole_word);
+        $ctrls[] = new Tooltip($ctrl, $tip, array('style'=>'width:220px;'));
+        $ctrls[] = 'Whole word&nbsp;&nbsp;';
+        
+        $table->add_row($ctrls);
+        
+        $attrs = array('style'=>'margin:0px 3px 8px 3px;');
+        $table = new CHtmlTable($attrs);
+        $this->add_inner($table);
+        $ctrls = [];
         
         if (is_array($scores))
         {
@@ -27,15 +50,12 @@ class MarkSpamTextForm extends CForm
         	$this->add_inner(new CHtmlHidden('score', $score));
         }
         
-        $tip_attrs = array('style'=>'width:350px;');
-        $tip = 'Enter spam text, or regular expression<br/>
-        for ex. /expression here/.<br/>
+        $tip = 'Enter spam text here.<br/>
         You may use several phrases<br/>
-        by separating them with | character, as in<br/>
-        first|second|third';
+        by separating them with | character,<br/> 
+		as in first|second|third';
         $ctrl = new CHtmlText('value', $value, array('style'=>'width:400px;', 'maxlength'=>200, 'autocomplete'=>'off'));
-        $ctrl = new Tooltip($ctrl, $tip, $tip_attrs);
-        $ctrls[] = $ctrl;
+        $ctrls[] = new Tooltip($ctrl, $tip, array('style'=>'width:330px;'));
         
         $attrs = $btn_width ? array('style'=>"width:{$btn_width}px;") : null;
         $ctrl = new CHtmlSubmit($submit, $attrs);

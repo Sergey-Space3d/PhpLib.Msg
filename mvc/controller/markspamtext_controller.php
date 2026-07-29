@@ -26,6 +26,10 @@ class MarkSpamTextController extends CController
         $this->set_arg('confirm', $confirm);
         $this->set_arg('submit', $submit);
         
+        $this->set_arg('greedy_match', CHtmlForm::get_value('greedy_match'));
+        $this->set_arg('case_sensitive', CHtmlForm::get_value('case_sensitive'));
+        $this->set_arg('whole_word', CHtmlForm::get_value('whole_word'));
+        
         $this->enable_post(true);
     }
     
@@ -35,24 +39,57 @@ class MarkSpamTextController extends CController
         $value = trim($this->get_value('value'));
         $score = (int)$this->get_value('score');
         
-        if (!strlen($value))
+        $greedy_match = $this->get_value('greedy_match');
+        $case_sensitive = $this->get_value('case_sensitive');
+        $whole_word = $this->get_value('whole_word');
+        
+        if (strlen($value) < 2)
         {
             CHtmlPage::set_last_error('Enter valid text');
             return false;
         }
         
-        if ($value[0] != '/')
+        // Compose search pattern
+        $b = $whole_word ? '\b' : '';
+        $i = $case_sensitive ? '' : 'i';
+        $s = $greedy_match ? '.*?' : '\s+';
+        
+        // Break value by OR elements
+        $arr = explode('|', $value);
+        
+        foreach ($arr as &$el)
         {
-            // Compose search pattern
-            $arr = explode('|', $value);
-            foreach ($arr as &$el) 
-            {
-                $el = trim($el);
-                $el = implode('.*?', explode(' ', $el));
-            }
-            $value = implode('|\b', $arr);
-            $value = "/\b{$value}/i";
+        	$el = trim($el);
+        	
+        	for ($n = 0, $el2 = '', $num_chars = strlen($el); $n < $num_chars; $n++)
+        	{
+        		// Add escape char for every non-alphanumberic char
+        		$el2 .= ($el[$n] == ' ' || ctype_alnum($el[$n])) ? $el[$n] : "\\{$el[$n]}";
+        	}
+        	
+        	$el = $el2;
+        	
+        	// For greedy match, allow text between original words
+        	$el = implode($s, array_filter(explode(' ', $el)));
+        	
+        	if ($el && $b)
+        	{
+        		// Don't append word boundary if the last char is not alphanumberic
+        		$el = ctype_alnum(substr($el, -1)) ? "{$b}{$el}{$b}" : "{$b}{$el}";
+        	}
         }
+        
+        $arr = array_filter($arr);
+        
+        if (!$arr)
+        {
+        	CHtmlPage::set_last_error('Enter valid text');
+        	return false;
+        }
+        
+        // Re-assemble OR elements
+        $value = implode("|", $arr);
+        $value = "/{$value}/{$i}";
         
         SpamFilterMan::Instance()->mark_spam($value, SpamFilter::TYPE_TEXT, $score);
         
