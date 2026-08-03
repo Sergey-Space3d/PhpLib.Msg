@@ -141,7 +141,7 @@ class IdentifySpamView extends ListView
         }
         
         $args = array('is_spam'=>true, 'btn_width'=>$btn_width);
-        $attrs = array('style'=>'text-align:right;float:right;border:2px solid #D2D6D0;margin:5px 0 5px 0;');
+        $attrs = array('style'=>'text-align:right;float:right;background-color:#D2D6D0;margin:5px 0 5px 0;');
         $form = CDispatcher::instance()->get_form("MarkSpamText", $args, $attrs);
         $table->add_row($form, array('colspan'=>'100%'));
         
