@@ -4,6 +4,7 @@
 
 define('SELECTOR_NOTIFICATION_ID', 'sel_id_notification');
 define('SELECTOR_MAILBOX_ID', 'sel_id_mailbox');
+define('SELECTOR_SENDER_DOMAIN', 'sel_sender_domain');
 define('SHOW_MAILBOX_HEADERS', 'show_mailbox_headers');
 
 class MsgDb

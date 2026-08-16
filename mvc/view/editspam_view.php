@@ -76,8 +76,22 @@ class EditSpamView extends ListView
         $form_view = new FormView($horizontal, array('style'=>'float:right;'));
         $forms = array();
         
-        $form = CDispatcher::instance()->get_form("DeleteSpamFilter", array('id'=>$spam_filter->get_id()));
-        $form_view->add_form($form);
+        if ($spam_filter->get_type() == SpamFilter::TYPE_TEXT)
+        {
+        	$args = array('id'=>$spam_filter->get_id());
+        	$form = CDispatcher::instance()->get_form("EditSpamText", $args);
+        	$forms['Edit'] = new CollapsedForm($form, 'Edit', array('class'=>'deck'), false);
+        	$form_view->add_form($forms['Edit']);
+        }
+        
+        $args = array('id'=>$spam_filter->get_id());
+        $forms['Delete'] = CDispatcher::instance()->get_form("DeleteSpamFilter", $args);
+        $form_view->add_form($forms['Delete']);
+        
+        if (isset($forms['Edit']))
+        {
+        	CollapsedForm::init_display($forms['Edit'], array_diff_key($forms, array('Edit'=>'')), true);
+        }
         
         return $form_view;
     }

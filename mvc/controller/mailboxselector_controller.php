@@ -8,7 +8,6 @@ class MailboxSelectorController extends SelectorController
 	/** The constructor */
 	public function __construct($action, array $args = null)
 	{
-		$this->set_arg('all', true);
 		parent::__construct($action, $args, 'Mailbox');
 	}
 	
@@ -21,6 +20,12 @@ class MailboxSelectorController extends SelectorController
 		$items = [];
 		foreach (MailboxMan::Instance()->get() as $mb) $items[$mb->get_id()] = $mb->get_username();
 		return $items;
+	}
+	
+	/** Called after the item is selected */
+	protected function on_selected()
+	{
+		CHtmlForm::set_value(SELECTOR_SENDER_DOMAIN, null, true);
 	}
 }
 ?>

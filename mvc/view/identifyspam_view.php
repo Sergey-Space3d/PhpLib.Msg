@@ -64,6 +64,24 @@ class IdentifySpamView extends ListView
         arsort($this->m_addresses);
         foreach ($this->m_addresses as $key=>&$val) $val = "{$key} ({$val})";
         
+        $sel_domip = CHtmlForm::get_value(SELECTOR_SENDER_DOMAIN);
+        $is_domain = $sel_domip ? !is_numeric(substr($sel_domip, -2)) : false;
+        
+        if ($sel_domip)
+        {
+        	// Filter emails - after harvesting domains and IPs
+        	$emails = array();
+        	
+        	foreach ($this->m_emails as $email)
+        	{
+        		if ($is_domain && !array_key_exists($sel_domip, $email->SenderDomains)) continue;
+        		if (!$is_domain && !in_array($sel_domip, $email->SenderIpGroups)) continue;
+        		$emails[] = $email;
+        	}
+        	
+        	$this->m_emails = $emails;
+        }
+
         $this->m_errors = EmailServer::pop_errors();
         
         parent::init_contents($args);
@@ -111,8 +129,14 @@ class IdentifySpamView extends ListView
         $attrs = array('colspan'=>'100%', 'style'=>'background-color:#99CCCC;padding:6px 100px 6px 50px;');
         $table->add_row($div, $attrs);
         
-        $sel_form = CDispatcher::instance()->get_form("MailboxSelector", null, array('style'=>'float:left;'));
+        $args = array('all'=>true, 'max_width'=>210);
+        $sel_form = CDispatcher::instance()->get_form("MailboxSelector", $args, array('style'=>'float:left;'));
         $div->add_inner($sel_form);
+        
+        $args = array('all'=>true, 'max_width'=>210, 'domains'=>$this->m_domains + $this->m_ip_groups, 'label'=>'Domains & IP Group');
+        $sel_form = CDispatcher::instance()->get_form("SenderDomainSelector", $args, array('style'=>'float:left;'));
+        $div->add_inner($sel_form);
+        
         $args = array('show_headers'=>$this->m_show_headers);
         $headers_form = CDispatcher::instance()->get_form("ShowHeaders", $args, array('style'=>'float:right;'));
         $div->add_inner($headers_form);
@@ -144,7 +168,7 @@ class IdentifySpamView extends ListView
         $attrs = array('style'=>'text-align:right;float:right;background-color:#D2D6D0;margin:5px 0 5px 0;');
         $form = CDispatcher::instance()->get_form("MarkSpamText", $args, $attrs);
         $table->add_row($form, array('colspan'=>'100%'));
-        
+
         return $items;
     }
     
