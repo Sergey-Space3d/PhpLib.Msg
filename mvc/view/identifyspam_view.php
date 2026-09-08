@@ -66,7 +66,7 @@ class IdentifySpamView extends ListView
         
         $sel_domip = CHtmlForm::get_value(SELECTOR_SENDER_DOMAIN);
         $is_domain = $sel_domip ? !is_numeric(substr($sel_domip, -2)) : false;
-        
+                
         if ($sel_domip)
         {
         	// Filter emails - after harvesting domains and IPs
@@ -307,6 +307,7 @@ class IdentifySpamView extends ListView
         {
             $desc = array($title);
             if ($value) $desc[] = $value;
+            if ($flags & SpamFilter::MISSING_SENDER_DOMAIN) $desc[] = 'Missing sender domain';
             if ($flags & SpamFilter::MULTIPLE_SENDERS) $desc[] = 'Multiple senders';
             if ($flags & SpamFilter::MULTIPLE_SENDER_DOMAINS) $desc[] = 'Multiple sender domains';
             if ($flags & SpamFilter::INVALID_SENDER_DOMAIN_IP) $desc[] = 'Invalid sender domain\'s IP';
@@ -333,7 +334,7 @@ class IdentifySpamView extends ListView
         	$el = new CHtmlElement('div', $attrs, $desc);
         	$table->add_row($el);
         	
-        	if ($this->m_domains)
+        	if ($email->SenderDomains)
         	{
         		$args = array('email'=>$email);
         		$attrs = array('style'=>$style.'background-color:#99CCCC;');

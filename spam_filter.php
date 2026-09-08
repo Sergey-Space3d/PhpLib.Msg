@@ -25,6 +25,7 @@ class SpamFilter extends CDbRecord
     const INVALID_SENDER_DOMAIN_IP = 0x04;
     const DATA_FILE_ATTACHED       = 0x08;
     const CALENDAR_FILE_ATTACHED   = 0x10;
+    const MISSING_SENDER_DOMAIN    = 0x20;
     
     /** The constructor */
     public function __construct($id = 0)

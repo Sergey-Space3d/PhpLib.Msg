@@ -11,6 +11,7 @@ class SpamFilterMan extends CDbRecordManSingleton
     SpamFilter::INVALID_SENDER_DOMAIN_IP=>2,
     SpamFilter::DATA_FILE_ATTACHED=>3,
     SpamFilter::CALENDAR_FILE_ATTACHED=>3,
+    SpamFilter::MISSING_SENDER_DOMAIN=>5,
     );
     
     /** The constructor */
@@ -24,7 +25,12 @@ class SpamFilterMan extends CDbRecordManSingleton
     {
         $flags = 0;
         
-        if (count($email->SenderDomains) > 1) 
+        if (count($email->SenderDomains) == 0)
+        {
+        	$flags = SpamFilter::MISSING_SENDER_DOMAIN;
+        	$score += $this->Scores[SpamFilter::MISSING_SENDER_DOMAIN];
+        }
+        else if (count($email->SenderDomains) > 1) 
         {
             $flags = SpamFilter::MULTIPLE_SENDER_DOMAINS;
             $score += $this->Scores[SpamFilter::MULTIPLE_SENDER_DOMAINS];
