@@ -200,7 +200,9 @@ class Email extends QueueMessage
 	/** Returns true if the record is valid */
 	public function verify() 
 	{
-	    return $this->validate($this->get_from()) && $this->validate($this->get_to());
+	    return 
+	    $this->validate($this->get_from()) && 
+	    $this->validate(array_keys($this->get_to()));
 	}
 	
 	/** Validate email address */
@@ -274,15 +276,15 @@ class Email extends QueueMessage
 	protected static function normalize_header_address($address, $name)
 	{
 	    if (!$address) return null;
-	    return $name ? "{$name} <{$address}>" : $address;
+	    return ($name && $name != $address) ? "{$name} <{$address}>" : $address;
 	}
 
 	/** Send the message */
 	public function send($queue = false)
 	{
 	    if (self::$Disabled) return true;
-	    
-	    if ($this->validate($this->get_from()) && $this->validate($this->get_to()))
+
+	    if ($this->verify())
 	    {
 	        // Normalize header addresses (RFC 2822)
 	        $normalize_header_addresses = function(array $addresses)
@@ -387,7 +389,7 @@ class Email extends QueueMessage
     		
     		try 
     		{
-                return $queue ? $this->write() : @mail($to, $subject, $content, $headers);
+    			return $queue ? $this->write() : @mail($to, $subject, $content, $headers);
     		} 
     		catch (Exception $e) 
     		{ 
